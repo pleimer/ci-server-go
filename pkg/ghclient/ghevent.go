@@ -9,7 +9,7 @@ import (
 
 // Event definitions from github
 type Event interface {
-	Handle(JSON []byte) GhObject
+	Handle(JSON []byte) (GhObject, error)
 }
 
 var events map[string]Event = map[string]Event{
@@ -32,13 +32,16 @@ type Push struct {
 }
 
 // Handle implements github Event.Handle
-func (p *Push) Handle(pushJSON []byte) GhObject {
+func (p *Push) Handle(pushJSON []byte) (GhObject, error) {
 	// Handle incoming webhook byte slice
 	// Retreive repo, branch, and commits and build/update
 	// internal structures
 
 	// check cache if repo exists. If not, create new one
-	eventMap := make(map[string][]byte)
+	eventMap := make(map[string]json.RawMessage)
 	json.Unmarshal(pushJSON, &eventMap)
+	if len(eventMap) == 0 {
+		return nil, errors.New("Failed parsing incoming event map")
+	}
 	return NewRepositoryFromJSON(eventMap["repository"])
 }
