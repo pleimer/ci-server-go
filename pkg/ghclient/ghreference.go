@@ -1,13 +1,16 @@
 package ghclient
 
-// Reference analogous to a git reference
-type Reference []*Commit
+import "strings"
 
-// GetHead get head commit of reference
-func (r *Reference) GetHead() Commit {
-	return *(*r)[len(*r)-1]
+// Reference analogous to a git reference. Points to a commit list
+type Reference struct {
+	head *Commit
 }
 
 func (r *Reference) String() string {
-	return "Method Reference.String() not implemented"
+	var sb strings.Builder
+	for c := r.head; c != nil; c = c.parent {
+		sb.WriteString(c.String())
+	}
+	return sb.String()
 }
