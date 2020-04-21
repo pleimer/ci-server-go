@@ -25,6 +25,7 @@ func TestHandle(t *testing.T) {
 			}{
 				Login: "Codertocat",
 			},
+			refs: make(map[string]*Reference),
 		}
 		assert.Equals(t, expRepo, repoUnderTest)
 	})

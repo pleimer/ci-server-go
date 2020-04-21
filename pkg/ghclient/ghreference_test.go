@@ -33,7 +33,7 @@ func genCommits(substr string, start int, num int) (*Commit, *Commit) {
 		newCommit = &Commit{
 			Sha: substr + "-" + strconv.Itoa(i+start+1),
 		}
-		prevCommit.linkChild(newCommit)
+		prevCommit.setChild(newCommit)
 		prevCommit = newCommit
 	}
 	return prevCommit, tail // head, tail
@@ -62,42 +62,37 @@ func compareCommits(t *testing.T, cExp *Commit, cRec *Commit) {
 
 func TestRegisterCommits(t *testing.T) {
 
-	repoUT := Repository{
-		refs: make(map[string]*Reference),
-	}
-	t.Run("register to empty cache", func(t *testing.T) {
-		head, _ := genCommits("original", 0, 3)
+	refUT := &Reference{}
+	t.Run("blank slate", func(t *testing.T) {
+		gen, _ := genCommits("original", 0, 3)
 
-		repoUT.registerCommits(head, "refs/head/master")
-		cGen := head
-		cUT := repoUT.refs["refs/head/master"].head
+		refUT.register(gen)
+		cmp, _ := genCommits("original", 0, 3)
 
-		compareCommits(t, cGen, cUT)
+		compareCommits(t, cmp, refUT.head)
 	})
 
 	t.Run("crossover", func(t *testing.T) {
 		gen, _ := genCommits("original", 1, 1)
 		gen2, genTail2 := genCommits("crossover", 0, 3)
-		gen.linkChild(genTail2)
+		gen.setChild(genTail2)
 
 		cmp, _ := genCommits("original", 0, 2)
 		cmp2, cmpTail2 := genCommits("crossover", 0, 3)
 		cmpTail2.parent = cmp.parent.parent
-		cmp.linkChild(cmpTail2)
+		cmp.setChild(cmpTail2)
 
-		repoUT.registerCommits(gen2, "refs/head/master")
+		refUT.register(gen2)
 
-		cUT := repoUT.refs["refs/head/master"].head
-		compareCommits(t, cmp2, cUT)
+		compareCommits(t, cmp2, refUT.head)
 	})
 
 	t.Run("no crossover", func(t *testing.T) {
 		gen, _ := genCommits("nocrossover", 0, 3)
-		repoUT.registerCommits(gen, "refs/head/master")
+		refUT.register(gen)
 
 		cmp, _ := genCommits("nocrossover", 0, 3)
-		cUT := repoUT.refs["refs/head/master"].head
 
-		compareCommits(t, cmp, cUT)
+		compareCommits(t, cmp, refUT.head)
 	})
 }

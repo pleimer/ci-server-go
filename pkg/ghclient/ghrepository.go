@@ -33,34 +33,12 @@ func (r *Repository) GetReference(refName string) Reference {
 	return *r.refs[refName]
 }
 
-// registerCommits register commits to reference
-func (r *Repository) registerCommits(incHead *Commit, refName string) {
-	// check for crossover between already registered commits and incoming commits.
-	// If none found, existing commits pointed to by ref are deleted and ref set to point
-	// to the incoming head. If duplicate parent found, children of the parent set to
-	// to the children of the incoming head
-
+func (r *Repository) register(incHead *Commit, refName string) {
 	if r.refs[refName] == nil {
-		r.refs[refName] = &Reference{
-			head: incHead,
-		}
-		return
+		r.refs[refName] = &Reference{}
 	}
 
-	var incTail *Commit
-	for c := incHead; c != nil; c = c.parent {
-		incTail = c
-	}
-
-	for c := r.refs[refName].head; c != nil; c = c.parent {
-		if c.Sha == incTail.Sha {
-			c.linkChild(incTail.child)
-			continue
-		}
-		c.child = nil
-	}
-
-	r.refs[refName].head = incHead
+	r.refs[refName].register(incHead)
 }
 
 func (r *Repository) String() string {

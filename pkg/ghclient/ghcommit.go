@@ -26,14 +26,19 @@ func (c *Commit) GetParent() Commit {
 	return *(c.parent)
 }
 
-func (c *Commit) linkChild(child *Commit) {
+func (c *Commit) setChild(child *Commit) {
 	child.parent = c
 	c.child = child
 }
 
+func (c *Commit) setParent(parent *Commit) {
+	c.parent = parent
+	parent.child = c
+}
+
 func (c *Commit) String() string {
 	ws := regexp.MustCompile(`\s+`)
-	return ws.ReplaceAllString(fmt.Sprintf("[%s %s %s]\n", c.Sha, c.Author.Name, c.Author.Email), " ")
+	return ws.ReplaceAllString(fmt.Sprintf("[%s %s %s %s]\n", c.Sha, c.Author.Name, c.Author.Email, c.Message), " ")
 }
 
 // CreateCommitFromJSON build commit from json byte slice
