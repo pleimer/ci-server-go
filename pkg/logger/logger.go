@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
+// LogLevel defines log levels
 type LogLevel int
 
+// defines log levels
 const (
 	DEBUG LogLevel = iota
 	INFO
@@ -20,64 +23,57 @@ func (l LogLevel) String() string {
 	return [...]string{"DEBUG", "INFO", "WARN", "ERROR"}[l]
 }
 
-type writer struct {
-	target  string
-	logfile *os.File
-}
+type writeFn func(string) error
 
-func (w *writer) Write(message string) error {
-	switch w.target {
-	case "console":
-		fmt.Print(message)
-		break
-	default:
-		var err error
-		if w.logfile == nil {
-			w.logfile, err = os.OpenFile(w.target, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-			if err != nil {
-				return err
-			}
-		}
-		_, err = w.logfile.WriteString(message)
-		if err != nil {
-			return err
-		}
-		break
-	}
-	return nil
-}
-
-func (w *writer) Close() error {
-	if w.logfile != nil {
-		return w.logfile.Close()
-	}
-	return nil
-}
-
+// Logger implements a simple logger with 4 levels
 type Logger struct {
 	Level     LogLevel
 	Timestamp bool
 	metadata  map[string]interface{}
-	writer    *writer
+	logfile   *os.File
+	write     writeFn
 }
 
-func NewLogger(level LogLevel, target string) *Logger {
+// NewLogger logger factory
+func NewLogger(level LogLevel, target string) (*Logger, error) {
 	var logger Logger
 	logger.Level = level
 	logger.Timestamp = false
 	logger.metadata = make(map[string]interface{})
 
-	logger.writer = &writer{
-		target: target,
+	switch strings.ToLower(target) {
+	case "console":
+		logger.write = func(message string) error {
+			fmt.Print(message)
+			return nil
+		}
+		break
+	default:
+		var err error
+		if logger.logfile == nil {
+			logger.logfile, err = os.OpenFile(target, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				return nil, err
+			}
+		}
+		logger.write = func(message string) error {
+			_, err := logger.logfile.WriteString(message)
+			return err
+		}
 	}
 
-	return &logger
+	return &logger, nil
 }
 
+// Destroy cleanup resources
 func (l *Logger) Destroy() error {
-	return l.writer.Close()
+	if l.logfile != nil {
+		return l.logfile.Close()
+	}
+	return nil
 }
 
+// Metadata set metadata to include in message
 func (l *Logger) Metadata(metadata map[string]interface{}) {
 	l.metadata = metadata
 }
@@ -134,10 +130,11 @@ func (l *Logger) writeRecord(level LogLevel, message string) error {
 	if err != nil {
 		return nil
 	}
-	err = l.writer.Write(build.String())
+	err = l.write(build.String())
 	return err
 }
 
+// Debug level debug
 func (l *Logger) Debug(message string) error {
 	if l.Level == DEBUG {
 		return l.writeRecord(DEBUG, message)
@@ -145,6 +142,7 @@ func (l *Logger) Debug(message string) error {
 	return nil
 }
 
+// Info level info
 func (l *Logger) Info(message string) error {
 	if l.Level <= INFO {
 		return l.writeRecord(INFO, message)
@@ -152,6 +150,7 @@ func (l *Logger) Info(message string) error {
 	return nil
 }
 
+// Warn level warn
 func (l *Logger) Warn(message string) error {
 	if l.Level <= WARN {
 		return l.writeRecord(WARN, message)
@@ -159,6 +158,7 @@ func (l *Logger) Warn(message string) error {
 	return nil
 }
 
+// Error level error
 func (l *Logger) Error(message string) error {
 	if l.Level <= ERROR {
 		return l.writeRecord(ERROR, message)
