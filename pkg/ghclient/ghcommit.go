@@ -7,11 +7,20 @@ import (
 	"regexp"
 )
 
+// Status github status object
+type Status struct {
+	State       string `json:"state"`
+	TargetURL   string `json:"target_url"`
+	Description string `json:"description"`
+	Context     string `json:"context`
+}
+
 // Commit resource tracking a github commit
 type Commit struct {
 	Sha     string `json:"sha"`
 	Message string `json:"message"`
 	URL     string `json:"url"`
+	Status  Status
 	Author  struct {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
