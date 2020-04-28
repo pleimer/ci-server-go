@@ -2,14 +2,14 @@ package ghclient
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 )
 
 // add pull request and comment
 
 // Event definitions from github
 type Event interface {
-	Handle(JSON []byte) (GhObject, error)
+	handle(*Client, []byte) error
 }
 
 var events map[string]Event = map[string]Event{
@@ -21,7 +21,7 @@ func EventFactory(incoming string) (Event, error) {
 	if e := events[incoming]; e != nil {
 		return e, nil
 	}
-	return nil, errors.New("Received error " + incoming + "does not exist")
+	return nil, fmt.Errorf("received error %s does not exist", incoming)
 }
 
 // Push implements github Event interface
@@ -31,17 +31,49 @@ type Push struct {
 	// commits
 }
 
-// Handle implements github Event.Handle
-func (p *Push) Handle(pushJSON []byte) (GhObject, error) {
-	// Handle incoming webhook byte slice
-	// Retreive repo, branch, and commits and build/update
-	// internal structures
-
-	// check cache if repo exists. If not, create new one
+func (p *Push) handle(client *Client, pushJSON []byte) error {
+	// push handle
+	// updates client repositories with pushed commits
 	eventMap := make(map[string]json.RawMessage)
-	json.Unmarshal(pushJSON, &eventMap)
-	if len(eventMap) == 0 {
-		return nil, errors.New("Failed parsing incoming event map")
+	err := json.Unmarshal(pushJSON, &eventMap)
+	if err != nil {
+		return fmt.Errorf("failed parsing push event json: %s", err)
 	}
-	return NewRepositoryFromJSON(eventMap["repository"])
+
+	repo, err := NewRepositoryFromJSON(eventMap["repository"])
+	if err != nil {
+		return err
+	}
+
+	if _, ok := client.repositories[repo.Name]; !ok {
+		client.repositories[repo.Name] = repo
+	}
+
+	var cSliceJSON []json.RawMessage
+	err = json.Unmarshal(eventMap["commits"], &cSliceJSON)
+	if err != nil {
+		return fmt.Errorf("failed parsing list of commits: %s", err)
+	}
+
+	var cSlice []Commit
+	for _, cJSON := range cSliceJSON {
+		c, err := NewCommitFromJSON(cJSON)
+		if err != nil {
+			return err
+		}
+		cSlice = append(cSlice, *c)
+	}
+
+	// create ordered list of parents
+	for i, c := range cSlice {
+		if i < len(cSlice)-1 {
+			c.setParent(&cSlice[i+1])
+		}
+	}
+	head := &cSlice[0]
+	cSlice = nil
+
+	refName := string(eventMap["ref"])
+	client.repositories[repo.Name].registerCommits(head, refName)
+	return nil
 }

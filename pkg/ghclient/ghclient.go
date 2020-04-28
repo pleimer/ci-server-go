@@ -42,35 +42,24 @@ func NewAPI() API {
 
 // Client github client object
 type Client struct {
-	oauth  string
-	api    API
-	client *http.Client
+	EventChan chan Event
+	ErrorChan chan error
+
+	oauth        string
+	api          API
+	client       *http.Client
+	repositories map[string]*Repository
 }
 
 // NewClient create a new github Client
 func NewClient() Client {
 	return Client{
-		api:    NewAPI(),
-		client: &http.Client{},
+		api:          NewAPI(),
+		client:       &http.Client{},
+		repositories: make(map[string]*Repository),
+		EventChan:    make(chan Event, 10),
+		ErrorChan:    make(chan error, 10),
 	}
-}
-
-func (c *Client) get(URL string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", URL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "token "+c.oauth)
-	return c.client.Do(req)
-}
-
-func (c *Client) post(URL string, body []byte) (*http.Response, error) {
-	req, err := http.NewRequest("POST", URL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "token "+c.oauth)
-	return c.client.Do(req)
 }
 
 // Authenticate set and test authentication with Oauth token
@@ -102,4 +91,39 @@ func (c *Client) UpdateStatus(repo Repository, commit Commit) error {
 		return fmt.Errorf("Failed to update github status. Received status %s", res.Status)
 	}
 	return nil
+}
+
+// Listen listen on address for webhooks
+func (c *Client) Listen(address string) error {
+	http.HandleFunc("/webhook", c.webhookHandler)
+	return http.ListenAndServe(address, nil)
+}
+
+func (c *Client) webhookHandler(w http.ResponseWriter, req *http.Request) {
+	ev, err := EventFactory(req.Header.Get("X-Github-Event"))
+	if err != nil {
+		c.ErrorChan <- err
+		return
+	}
+	c.EventChan <- ev
+}
+
+// Helper functions
+
+func (c *Client) get(URL string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", URL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "token "+c.oauth)
+	return c.client.Do(req)
+}
+
+func (c *Client) post(URL string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest("POST", URL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "token "+c.oauth)
+	return c.client.Do(req)
 }

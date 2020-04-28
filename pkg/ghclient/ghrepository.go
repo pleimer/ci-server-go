@@ -33,8 +33,8 @@ func (r *Repository) GetReference(refName string) Reference {
 	return *r.refs[refName]
 }
 
-func (r *Repository) register(incHead *Commit, refName string) {
-	if r.refs[refName] == nil {
+func (r *Repository) registerCommits(incHead *Commit, refName string) {
+	if _, ok := r.refs[refName]; !ok {
 		r.refs[refName] = &Reference{}
 	}
 

@@ -2,7 +2,6 @@ package ghclient
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 )
@@ -20,6 +19,7 @@ type Commit struct {
 	Sha     string `json:"sha"`
 	Message string `json:"message"`
 	URL     string `json:"url"`
+	ID      string `json:"id"`
 	Status  Status
 	Author  struct {
 		Name     string `json:"name"`
@@ -50,12 +50,15 @@ func (c *Commit) String() string {
 	return ws.ReplaceAllString(fmt.Sprintf("[%s %s %s %s]\n", c.Sha, c.Author.Name, c.Author.Email, c.Message), " ")
 }
 
-// CreateCommitFromJSON build commit from json byte slice
-func CreateCommitFromJSON(commitJSON []byte) (*Commit, error) {
+// NewCommitFromJSON build commit from json byte slice
+func NewCommitFromJSON(commitJSON []byte) (*Commit, error) {
 	commit := &Commit{}
-	json.Unmarshal(commitJSON, &commit)
+	err := json.Unmarshal(commitJSON, &commit)
+	if err != nil {
+		return nil, err
+	}
 	if commit.Sha == "" {
-		return nil, errors.New("Failed parsing commit json")
+		commit.Sha = commit.ID
 	}
 	return commit, nil
 }

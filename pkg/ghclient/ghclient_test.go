@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/infrawatch/ci-server-go/pkg/assert"
 )
@@ -112,4 +114,26 @@ func TestUpdateStatus(t *testing.T) {
 
 	err := gh.UpdateStatus(repo, commit)
 	assert.Ok(t, err)
+}
+
+func TestListen(t *testing.T) {
+	gh := NewClient()
+
+	go gh.Listen(":8888")
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:8888/webhook", strings.NewReader(`{payload:"payload"}`))
+
+	time.Sleep(time.Second)
+	req.Header.Set("X-Github-Event", "push")
+
+	srv := http.Client{}
+	_, err := srv.Do(req)
+	assert.Ok(t, err)
+
+	select {
+	case err := <-gh.ErrorChan:
+		assert.Ok(t, err)
+	case <-gh.EventChan:
+	default:
+		t.Errorf("Did not receive event or error")
+	}
 }
