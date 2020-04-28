@@ -26,14 +26,11 @@ func EventFactory(incoming string) (Event, error) {
 
 // Push implements github Event interface
 type Push struct {
-	// repo
-	// branch
-	// commits
 }
 
 func (p *Push) handle(client *Client, pushJSON []byte) error {
-	// push handle
 	// updates client repositories with pushed commits
+
 	eventMap := make(map[string]json.RawMessage)
 	err := json.Unmarshal(pushJSON, &eventMap)
 	if err != nil {
