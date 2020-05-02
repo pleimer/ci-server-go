@@ -28,6 +28,7 @@ func NewTestClient(fn RoundTripFunc) *http.Client {
 }
 
 func TestAuthenticate(t *testing.T) {
+	oauth := strings.NewReader("oauthstring")
 	t.Run("valid request", func(t *testing.T) {
 		client := NewTestClient(func(req *http.Request) *http.Response {
 			expectedHeader := make(http.Header)
@@ -42,12 +43,9 @@ func TestAuthenticate(t *testing.T) {
 			}
 		})
 
-		gh := Client{
-			api:    NewAPI(),
-			client: client,
-		}
-
-		err := gh.Authenticate("oauthstring")
+		api := NewAPI()
+		api.client = client
+		err := api.Authenticate(oauth)
 		assert.Ok(t, err)
 	})
 
@@ -61,12 +59,10 @@ func TestAuthenticate(t *testing.T) {
 			}
 		})
 
-		gh := Client{
-			api:    NewAPI(),
-			client: client,
-		}
+		api := NewAPI()
+		api.client = client
 
-		err := gh.Authenticate("oauthstring")
+		err := api.Authenticate(oauth)
 		assert.Assert(t, (err != nil), "Should have been an error")
 	})
 }
@@ -107,9 +103,12 @@ func TestUpdateStatus(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
+
+	api := NewAPI()
+	api.client = client
+
 	gh := Client{
-		api:    NewAPI(),
-		client: client,
+		api: api,
 	}
 
 	err := gh.UpdateStatus(repo, commit)
@@ -117,7 +116,9 @@ func TestUpdateStatus(t *testing.T) {
 }
 
 func TestListen(t *testing.T) {
-	gh := NewClient()
+	eventChan := make(chan Event, 10)
+	errChan := make(chan error, 10)
+	gh := NewClient(eventChan, errChan)
 
 	go gh.Listen(":8888")
 	req, _ := http.NewRequest("POST", "http://127.0.0.1:8888/webhook", strings.NewReader(`{payload:"payload"}`))
