@@ -141,125 +141,174 @@ func TestListen(t *testing.T) {
 
 func TestGetTree(t *testing.T) {
 	// Test inputs
-	t0Input := treeMarshal{
-		Sha: "t0",
-		Tree: []childRef{
-			{
-				Sha:  "b1",
-				Type: "blob",
-				Path: "t0/b1",
+	t.Run("no cache hits", func(t *testing.T) {
+
+		t0Input := treeMarshal{
+			Sha: "t0",
+			Tree: []childRef{
+				{
+					Sha:  "b1",
+					Type: "blob",
+					Path: "t0/b1",
+				},
+				{
+					Sha:  "t1",
+					Type: "tree",
+					Path: "t0/t1",
+				},
 			},
-			{
-				Sha:  "t1",
-				Type: "tree",
-				Path: "t0/t1",
+		}
+
+		t1Input := treeMarshal{
+			Sha: "t1",
+			Tree: []childRef{
+				{
+					Sha:  "b2",
+					Type: "blob",
+					Path: "t0/t1/b2",
+				},
+				{
+					Sha:  "b22",
+					Type: "blob",
+					Path: "t0/t1/b22",
+				},
 			},
-		},
-	}
+		}
 
-	t1Input := treeMarshal{
-		Sha: "t1",
-		Tree: []childRef{
-			{
-				Sha:  "b2",
-				Type: "blob",
-				Path: "t0/t1/b2",
+		// Tree to compare to
+		t0 := &Tree{
+			Sha:  "t0",
+			Path: "t0",
+		}
+
+		b1 := &Blob{
+			Sha:     "b1",
+			Content: "contents1",
+			Path:    "t0/b1",
+		}
+		t0.SetChild(b1)
+
+		t1 := &Tree{
+			Sha:  "t1",
+			Path: "t0/t1",
+		}
+
+		b2 := &Blob{
+			Sha:     "b2",
+			Content: "contents2",
+			Path:    "t0/t1/b2",
+		}
+		t1.SetChild(b2)
+
+		b22 := &Blob{
+			Sha:     "b22",
+			Content: "contents2",
+			Path:    "t0/t1/b22",
+		}
+		t1.SetChild(b22)
+		t0.SetChild(t1)
+
+		client := NewTestClient(func(req *http.Request) *http.Response {
+			var respBody []byte
+			var err error
+
+			switch req.URL.String() {
+			case "https://api.github.com/repos/owner/example/git/trees/t0":
+				respBody, err = json.Marshal(t0Input)
+				assert.Ok(t, err)
+
+			case "https://api.github.com/repos/owner/example/git/blobs/b1":
+				respBody, err = json.Marshal(b1)
+				assert.Ok(t, err)
+			case "https://api.github.com/repos/owner/example/git/trees/t1":
+				respBody, err = json.Marshal(t1Input)
+				assert.Ok(t, err)
+			case "https://api.github.com/repos/owner/example/git/blobs/b2":
+				respBody, err = json.Marshal(b2)
+				assert.Ok(t, err)
+			case "https://api.github.com/repos/owner/example/git/blobs/b22":
+				respBody, err = json.Marshal(b22)
+				assert.Ok(t, err)
+			default:
+				return &http.Response{
+					StatusCode: 404,
+					Status:     "404 Not Found",
+					Body:       ioutil.NopCloser(strings.NewReader("not found")),
+					Header:     make(http.Header),
+				}
+			}
+			return &http.Response{
+				StatusCode: 200,
+				Status:     "200 OK",
+				Body:       ioutil.NopCloser(bytes.NewReader(respBody)),
+				Header:     make(http.Header),
+			}
+		})
+
+		repo := Repository{
+			Name: "example",
+			Owner: struct {
+				Login string `json:"login"`
+			}{
+				Login: "owner",
 			},
-			{
-				Sha:  "b22",
-				Type: "blob",
-				Path: "t0/t1/b22",
-			},
-		},
-	}
+		}
 
-	// Tree to compare to
-	t0 := &Tree{
-		Sha:  "t0",
-		Path: "t0",
-	}
+		api := NewAPI()
+		api.client = client
 
-	b1 := &Blob{
-		Sha:     "b1",
-		Content: "contents1",
-		Path:    "t0/b1",
-	}
-	t0.SetChild(b1)
+		gh := Client{
+			api: api,
+		}
 
-	t1 := &Tree{
-		Sha:  "t1",
-		Path: "t0/t1",
-	}
+		tree, err := gh.GetTree("t0", repo)
+		assert.Ok(t, err)
+		assert.Equals(t, t0, tree)
+	})
 
-	b2 := &Blob{
-		Sha:     "b2",
-		Content: "contents2",
-		Path:    "t0/t1/b2",
-	}
-	t1.SetChild(b2)
+	t.Run("cache hits", func(t *testing.T) {
+		t0Input := treeMarshal{
+			Sha: "t0",
+		}
 
-	b22 := &Blob{
-		Sha:     "b22",
-		Content: "contents2",
-		Path:    "t0/t1/b22",
-	}
-	t1.SetChild(b22)
-	t0.SetChild(t1)
-
-	client := NewTestClient(func(req *http.Request) *http.Response {
 		var respBody []byte
 		var err error
 
-		switch req.URL.String() {
-		case "https://api.github.com/repos/owner/example/git/trees/t0":
+		misses := 0
+		client := NewTestClient(func(req *http.Request) *http.Response {
+			assert.Assert(t, (misses <= 1), "two api calls when there only should have been one")
 			respBody, err = json.Marshal(t0Input)
 			assert.Ok(t, err)
+			misses++
 
-		case "https://api.github.com/repos/owner/example/git/blobs/b1":
-			respBody, err = json.Marshal(b1)
-			assert.Ok(t, err)
-		case "https://api.github.com/repos/owner/example/git/trees/t1":
-			respBody, err = json.Marshal(t1Input)
-			assert.Ok(t, err)
-		case "https://api.github.com/repos/owner/example/git/blobs/b2":
-			respBody, err = json.Marshal(b2)
-			assert.Ok(t, err)
-		case "https://api.github.com/repos/owner/example/git/blobs/b22":
-			respBody, err = json.Marshal(b22)
-			assert.Ok(t, err)
-		default:
 			return &http.Response{
-				StatusCode: 404,
-				Status:     "404 Not Found",
-				Body:       ioutil.NopCloser(strings.NewReader("not found")),
+				StatusCode: 200,
+				Status:     "200 OK",
+				Body:       ioutil.NopCloser(bytes.NewReader(respBody)),
 				Header:     make(http.Header),
 			}
+		})
+
+		repo := Repository{
+			Name: "example",
+			Owner: struct {
+				Login string `json:"login"`
+			}{
+				Login: "owner",
+			},
 		}
-		return &http.Response{
-			StatusCode: 200,
-			Status:     "200 OK",
-			Body:       ioutil.NopCloser(bytes.NewReader(respBody)),
-			Header:     make(http.Header),
+
+		api := NewAPI()
+		api.client = client
+
+		gh := Client{
+			api:   api,
+			cache: NewCache(),
 		}
+
+		_, err = gh.GetTree("t0", repo)
+		assert.Ok(t, err)
+		_, err = gh.GetTree("t0", repo)
+		assert.Ok(t, err)
 	})
-
-	repo := Repository{
-		Name: "example",
-		Owner: struct {
-			Login string `json:"login"`
-		}{
-			Login: "owner",
-		},
-	}
-
-	api := NewAPI()
-	api.client = client
-
-	gh := Client{
-		api: api,
-	}
-
-	tree, err := gh.GetTree("t0", repo)
-	assert.Ok(t, err)
-	assert.Equals(t, t0, tree)
 }
