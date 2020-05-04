@@ -258,7 +258,8 @@ func TestGetTree(t *testing.T) {
 		api.client = client
 
 		gh := Client{
-			api: api,
+			api:   api,
+			cache: NewCache(),
 		}
 
 		tree, err := gh.GetTree("t0", repo)
