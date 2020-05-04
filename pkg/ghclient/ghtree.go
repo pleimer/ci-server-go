@@ -155,6 +155,14 @@ func (c *Cache) GetTree(sha string) *Tree {
 	return c.trees[sha]
 }
 
+func (c *Cache) WriteBlob(b *Blob) {
+	c.blobs[b.Sha] = b
+}
+
+func (c *Cache) WriteTree(t *Tree) {
+	c.trees[t.Sha] = t
+}
+
 func (c *Client) buildTree(parent Node, treeMarsh treeMarshal, repo Repository) error {
 	if parent == nil {
 		return nil
@@ -181,6 +189,7 @@ func (c *Client) buildTree(parent Node, treeMarsh treeMarshal, repo Repository) 
 
 			child.Path = cRef.Path
 
+			c.cache.WriteBlob(child)
 			parent.SetChild(child)
 
 		case "tree":
@@ -202,6 +211,7 @@ func (c *Client) buildTree(parent Node, treeMarsh treeMarshal, repo Repository) 
 
 			child.Path = cRef.Path
 
+			c.cache.WriteTree(child)
 			parent.SetChild(child)
 
 			err = json.Unmarshal(treeJSON, &treeMarsh)
