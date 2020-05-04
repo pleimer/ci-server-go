@@ -183,7 +183,7 @@ func TestGetTree(t *testing.T) {
 
 		b1 := &Blob{
 			Sha:     "b1",
-			Content: "contents1",
+			Content: "dGhpcyBpcyBteSBsaWZl",
 			Path:    "t0/b1",
 		}
 		t0.SetChild(b1)
@@ -195,14 +195,14 @@ func TestGetTree(t *testing.T) {
 
 		b2 := &Blob{
 			Sha:     "b2",
-			Content: "contents2",
+			Content: "dGhpcyBpcyBteSBsaWZl",
 			Path:    "t0/t1/b2",
 		}
 		t1.SetChild(b2)
 
 		b22 := &Blob{
 			Sha:     "b22",
-			Content: "contents2",
+			Content: "dGhpcyBpcyBteSBsaWZl",
 			Path:    "t0/t1/b22",
 		}
 		t1.SetChild(b22)
@@ -264,6 +264,9 @@ func TestGetTree(t *testing.T) {
 		tree, err := gh.GetTree("t0", repo)
 		assert.Ok(t, err)
 		assert.Equals(t, t0, tree)
+
+		err = gh.WriteTreeToDirectory(tree, "")
+		assert.Ok(t, err)
 	})
 
 	t.Run("cache hits", func(t *testing.T) {

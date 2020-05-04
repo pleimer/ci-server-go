@@ -1,9 +1,11 @@
 package ghclient
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
@@ -18,15 +20,16 @@ type treeMarshal struct {
 	Tree []childRef `json:"tree"`
 }
 
+// Node represents node in file tree
 type Node interface {
 	GetParent() Node
 	GetChildren() []Node
 	SetChild(Node)
-	Write(io.Writer) error
 
 	setParent(Node)
 }
 
+// Tree github tree type
 type Tree struct {
 	Sha  string `json:"sha"`
 	Path string `json:"path"`
@@ -45,6 +48,7 @@ func NewTreeFromJSON(tJSON []byte) (*Tree, error) {
 	return tree, nil
 }
 
+//GetParent implements type Node
 func (t *Tree) GetParent() Node {
 	return t.parent
 }
@@ -62,10 +66,7 @@ func (t *Tree) SetChild(child Node) {
 	t.children = append(t.children, child)
 }
 
-func (t *Tree) Write(w io.Writer) error {
-	return nil
-}
-
+// helper function for printing out nodes in tree order
 func recursivePrint(t Node) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("\n")
@@ -124,7 +125,12 @@ func (b *Blob) SetChild(child Node) {
 }
 
 func (b *Blob) Write(w io.Writer) error {
-	return nil
+	decoded, err := base64.StdEncoding.DecodeString(b.Content)
+	if err != nil {
+		return fmt.Errorf("when decoding blob %s content: %s", b.Sha, err)
+	}
+	_, err = w.Write(decoded)
+	return fmt.Errorf("when writing blob %s to writer: %s", b.Sha, err)
 }
 
 //Cache one way cache for tracking github trees
@@ -243,4 +249,26 @@ func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
 		return nil, err
 	}
 	return top, nil
+}
+
+// WriteTreeToDirectory write tree to specified file path
+func (c *Client) WriteTreeToDirectory(top Node, path string) error {
+	switch v := top.(type) {
+	case *Tree:
+		os.Mkdir(path+v.Path, 0777)
+	case *Blob:
+		f, err := os.Create(path + v.Path)
+		if err != nil {
+			return err
+		}
+		v.Write(f)
+	}
+	for _, child := range top.GetChildren() {
+		err := c.WriteTreeToDirectory(child, path)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
