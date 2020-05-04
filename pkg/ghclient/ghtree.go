@@ -251,13 +251,14 @@ func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
 	return top, nil
 }
 
-// WriteTreeToDirectory write tree to specified file path
+// WriteTreeToDirectory write tree to specified directory path
 func (c *Client) WriteTreeToDirectory(top Node, path string) error {
 	switch v := top.(type) {
 	case *Tree:
 		os.Mkdir(path+v.Path, 0777)
 	case *Blob:
 		f, err := os.Create(path + v.Path)
+		defer f.Close()
 		if err != nil {
 			return err
 		}
