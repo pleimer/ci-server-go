@@ -254,6 +254,7 @@ func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
 		children: []Node{},
 	}
 
+	c.cache.WriteTree(top)
 	err = c.buildTree(top, treeMarsh, repo)
 	if err != nil {
 		return nil, err
