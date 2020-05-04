@@ -45,8 +45,35 @@ func (a *API) PostStatus(owner, repo, commitSha string, body []byte) error {
 	if err != nil {
 		return err
 	}
-
 	return assertCode(res, 201, "failed to update github status")
+}
+
+// GetTree retrieve github tree
+func (a *API) GetTree(owner, repo, sha string) ([]byte, error) {
+	res, err := a.get(a.treeURL(owner, repo, sha))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := assertCode(res, 200, "failed to retrieve github tree"); err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadAll(res.Body)
+}
+
+// GetBlob retrieve github tree
+func (a *API) GetBlob(owner, repo, sha string) ([]byte, error) {
+	res, err := a.get(a.blobURL(owner, repo, sha))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := assertCode(res, 200, "failed to retrieve github blob"); err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadAll(res.Body)
 }
 
 func (a *API) get(URL string) (*http.Response, error) {
@@ -72,7 +99,7 @@ func (a *API) statusURL(owner, repo, sha string) string {
 }
 
 func (a *API) treeURL(owner, repo, treeSha string) string {
-	return a.makeURL([]string{"repos", owner, repo, "git", "trees", treeSha}, "recursive=1")
+	return a.makeURL([]string{"repos", owner, repo, "git", "trees", treeSha})
 }
 
 func (a *API) blobURL(owner, repo, fileSha string) string {
@@ -104,7 +131,7 @@ func assertCode(res *http.Response, status int, premsg string) error {
 	defer res.Body.Close()
 
 	if res.StatusCode != status {
-		return fmt.Errorf(premsg+" Received status %s", res.Status)
+		return fmt.Errorf(premsg+". Received status: %s", res.Status)
 	}
 	return nil
 }
