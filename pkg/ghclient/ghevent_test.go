@@ -42,7 +42,7 @@ func TestHandle(t *testing.T) {
 
 		pushEvent := &Push{}
 
-		err = pushEvent.handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(&gh, testRepoJSON)
 		if err != nil {
 			assert.Ok(t, err)
 		}

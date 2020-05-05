@@ -12,21 +12,6 @@ import (
 	"github.com/infrawatch/ci-server-go/pkg/assert"
 )
 
-// RoundTripFunc mock http Transport
-type RoundTripFunc func(req *http.Request) *http.Response
-
-// RoundTrip .
-func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req), nil
-}
-
-//NewTestClient returns *http.Client with Transport replaced to avoid making real calls
-func NewTestClient(fn RoundTripFunc) *http.Client {
-	return &http.Client{
-		Transport: RoundTripFunc(fn),
-	}
-}
-
 func TestAuthenticate(t *testing.T) {
 	oauth := strings.NewReader("oauthstring")
 	t.Run("valid request", func(t *testing.T) {
@@ -44,7 +29,7 @@ func TestAuthenticate(t *testing.T) {
 		})
 
 		api := NewAPI()
-		api.client = client
+		api.Client = client
 		err := api.Authenticate(oauth)
 		assert.Ok(t, err)
 	})
@@ -60,7 +45,7 @@ func TestAuthenticate(t *testing.T) {
 		})
 
 		api := NewAPI()
-		api.client = client
+		api.Client = client
 
 		err := api.Authenticate(oauth)
 		assert.Assert(t, (err != nil), "Should have been an error")
@@ -105,10 +90,10 @@ func TestUpdateStatus(t *testing.T) {
 	})
 
 	api := NewAPI()
-	api.client = client
+	api.Client = client
 
 	gh := Client{
-		api: api,
+		Api: api,
 	}
 
 	err := gh.UpdateStatus(repo, commit)
@@ -143,9 +128,9 @@ func TestGetTree(t *testing.T) {
 	// Test inputs
 	t.Run("no cache hits", func(t *testing.T) {
 
-		t0Input := treeMarshal{
+		t0Input := TreeMarshal{
 			Sha: "t0",
-			Tree: []childRef{
+			Tree: []ChildRef{
 				{
 					Sha:  "b1",
 					Type: "blob",
@@ -159,9 +144,9 @@ func TestGetTree(t *testing.T) {
 			},
 		}
 
-		t1Input := treeMarshal{
+		t1Input := TreeMarshal{
 			Sha: "t1",
-			Tree: []childRef{
+			Tree: []ChildRef{
 				{
 					Sha:  "b2",
 					Type: "blob",
@@ -255,10 +240,10 @@ func TestGetTree(t *testing.T) {
 		}
 
 		api := NewAPI()
-		api.client = client
+		api.Client = client
 
 		gh := Client{
-			api:   api,
+			Api:   api,
 			cache: NewCache(),
 		}
 
@@ -266,12 +251,12 @@ func TestGetTree(t *testing.T) {
 		assert.Ok(t, err)
 		assert.Equals(t, t0, tree)
 
-		err = gh.WriteTreeToDirectory(tree, "")
+		err = WriteTreeToDirectory(tree, "")
 		assert.Ok(t, err)
 	})
 
 	t.Run("cache hits", func(t *testing.T) {
-		t0Input := treeMarshal{
+		t0Input := TreeMarshal{
 			Sha: "t0",
 		}
 
@@ -303,10 +288,10 @@ func TestGetTree(t *testing.T) {
 		}
 
 		api := NewAPI()
-		api.client = client
+		api.Client = client
 
 		gh := Client{
-			api:   api,
+			Api:   api,
 			cache: NewCache(),
 		}
 

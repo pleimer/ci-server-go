@@ -10,14 +10,14 @@ import (
 )
 
 // Interim object for holding tree data from api calls in expected format
-type childRef struct {
+type ChildRef struct {
 	Path string `json:"path"`
 	Type string `json:"type"`
 	Sha  string `json:"sha"`
 }
-type treeMarshal struct {
+type TreeMarshal struct {
 	Sha  string     `json:"sha"`
-	Tree []childRef `json:"tree"`
+	Tree []ChildRef `json:"tree"`
 }
 
 // Node represents node in file tree
@@ -163,7 +163,7 @@ func (c *Cache) WriteTree(t *Tree) {
 	c.trees[t.Sha] = t
 }
 
-func (c *Client) buildTree(parent Node, treeMarsh treeMarshal, repo Repository) error {
+func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) error {
 	if parent == nil {
 		return nil
 	}
@@ -177,7 +177,7 @@ func (c *Client) buildTree(parent Node, treeMarsh treeMarshal, repo Repository) 
 				continue
 			}
 
-			blobJSON, err := c.api.GetBlob(repo.Owner.Login, repo.Name, cRef.Sha)
+			blobJSON, err := c.Api.GetBlob(repo.Owner.Login, repo.Name, cRef.Sha)
 			if err != nil {
 				return err
 			}
@@ -199,7 +199,7 @@ func (c *Client) buildTree(parent Node, treeMarsh treeMarshal, repo Repository) 
 				continue
 			}
 
-			treeJSON, err := c.api.GetTree(repo.Owner.Login, repo.Name, cRef.Sha)
+			treeJSON, err := c.Api.GetTree(repo.Owner.Login, repo.Name, cRef.Sha)
 			if err != nil {
 				return err
 			}
@@ -236,12 +236,12 @@ func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
 		return t, nil
 	}
 
-	treeJSON, err := c.api.GetTree(repo.Owner.Login, repo.Name, sha)
+	treeJSON, err := c.Api.GetTree(repo.Owner.Login, repo.Name, sha)
 	if err != nil {
 		return nil, err
 	}
 
-	treeMarsh := treeMarshal{}
+	treeMarsh := TreeMarshal{}
 	err = json.Unmarshal(treeJSON, &treeMarsh)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling tree json: %s", err)
@@ -263,24 +263,44 @@ func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
 }
 
 // WriteTreeToDirectory write tree to specified directory path
-func (c *Client) WriteTreeToDirectory(top Node, path string) error {
+func WriteTreeToDirectory(top Node, path string) error {
+	return recurseTreeAction(top,
+		func(t *Tree) error {
+			err := os.Mkdir(path+t.Path, 0777)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		func(b *Blob) error {
+			f, err := os.Create(path + b.Path)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			b.Write(f)
+			return nil
+		})
+}
+
+func recurseTreeAction(top Node, treeAction func(*Tree) error, blobAction func(*Blob) error) error {
 	switch v := top.(type) {
 	case *Tree:
-		os.Mkdir(path+v.Path, 0777)
-	case *Blob:
-		f, err := os.Create(path + v.Path)
-		defer f.Close()
+		err := treeAction(v)
 		if err != nil {
 			return err
 		}
-		v.Write(f)
+	case *Blob:
+		err := blobAction(v)
+		if err != nil {
+			return err
+		}
 	}
 	for _, child := range top.GetChildren() {
-		err := c.WriteTreeToDirectory(child, path)
+		err := recurseTreeAction(child, treeAction, blobAction)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }

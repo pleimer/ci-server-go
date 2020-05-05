@@ -38,7 +38,7 @@ func (r *Repository) registerCommits(incHead *Commit, refName string) {
 		r.refs[refName] = &Reference{}
 	}
 
-	r.refs[refName].register(incHead)
+	r.refs[refName].Register(incHead)
 }
 
 func (r *Repository) String() string {

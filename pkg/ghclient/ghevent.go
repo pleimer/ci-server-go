@@ -9,7 +9,7 @@ import (
 
 // Event definitions from github
 type Event interface {
-	handle(*Client, []byte) error
+	Handle(*Client, []byte) error
 }
 
 var events map[string]Event = map[string]Event{
@@ -26,9 +26,11 @@ func EventFactory(incoming string) (Event, error) {
 
 // Push implements github Event interface
 type Push struct {
+	Ref  Reference
+	Repo Repository
 }
 
-func (p *Push) handle(client *Client, pushJSON []byte) error {
+func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	// updates client repositories with pushed commits
 
 	eventMap := make(map[string]json.RawMessage)
@@ -72,5 +74,8 @@ func (p *Push) handle(client *Client, pushJSON []byte) error {
 
 	refName := string(eventMap["ref"])
 	client.repositories[repo.Name].registerCommits(head, refName)
+
+	p.Repo = *repo
+	p.Ref = repo.GetReference(refName)
 	return nil
 }

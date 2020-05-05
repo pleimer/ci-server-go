@@ -66,7 +66,7 @@ func TestRegisterCommits(t *testing.T) {
 	t.Run("blank slate", func(t *testing.T) {
 		gen, _ := genCommits("original", 0, 3)
 
-		refUT.register(gen)
+		refUT.Register(gen)
 		cmp, _ := genCommits("original", 0, 3)
 
 		compareCommits(t, cmp, refUT.head)
@@ -82,14 +82,14 @@ func TestRegisterCommits(t *testing.T) {
 		cmpTail2.parent = cmp.parent.parent
 		cmp.setChild(cmpTail2)
 
-		refUT.register(gen2)
+		refUT.Register(gen2)
 
 		compareCommits(t, cmp2, refUT.head)
 	})
 
 	t.Run("no crossover", func(t *testing.T) {
 		gen, _ := genCommits("nocrossover", 0, 3)
-		refUT.register(gen)
+		refUT.Register(gen)
 
 		cmp, _ := genCommits("nocrossover", 0, 3)
 

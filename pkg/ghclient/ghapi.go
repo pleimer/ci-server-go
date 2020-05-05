@@ -11,16 +11,16 @@ import (
 
 //API generates github URLS
 type API struct {
-	baseURL string
-	client  *http.Client
+	Client  *http.Client
+	BaseURL string
 	oauth   string
 }
 
 // NewAPI creates new api type
 func NewAPI() API {
 	return API{
-		client:  &http.Client{},
-		baseURL: "https://api.github.com",
+		Client:  &http.Client{},
+		BaseURL: "https://api.github.com",
 	}
 }
 
@@ -31,7 +31,7 @@ func (a *API) Authenticate(oauth io.Reader) error {
 		return fmt.Errorf("reading oauth token failed: %s", err)
 	}
 	a.oauth = string(obytes)
-	res, err := a.get(a.baseURL)
+	res, err := a.get(a.BaseURL)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (a *API) get(URL string) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "token "+a.oauth)
-	return a.client.Do(req)
+	return a.Client.Do(req)
 }
 
 func (a *API) post(URL string, body []byte) (*http.Response, error) {
@@ -90,7 +90,7 @@ func (a *API) post(URL string, body []byte) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "token "+a.oauth)
-	return a.client.Do(req)
+	return a.Client.Do(req)
 }
 
 func (a *API) statusURL(owner, repo, sha string) string {
@@ -107,7 +107,7 @@ func (a *API) blobURL(owner, repo, fileSha string) string {
 
 func (a *API) makeURL(items []string, params ...string) string {
 	var sb strings.Builder
-	sb.WriteString(a.baseURL)
+	sb.WriteString(a.BaseURL)
 	for _, item := range items {
 		sb.WriteString("/")
 		sb.WriteString(item)

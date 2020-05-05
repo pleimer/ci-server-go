@@ -9,29 +9,35 @@ import (
 )
 
 func Run() error {
-	evChan := make(chan ghclient.Event, 10)
-	errChan := make(chan error, 10)
-
 	log, err := logging.NewLogger(logging.ERROR, "console")
 	if err != nil {
 		return err
 	}
-
-	gh := ghclient.NewClient(evChan, errChan)
+	defer log.Destroy()
 
 	config, err := config.NewConfig()
 	if err != nil {
+		log.Error(fmt.Sprintf("%v", err))
 		return err
+	}
+
+	evChan := make(chan ghclient.Event, 10)
+	errChan := make(chan error, 10)
+
+	gh := ghclient.NewClient(evChan, errChan)
+	err = gh.Api.Authenticate(strings.NewReader(config.Oauth)),
+	if err != nil {,
+		log.Error(fmt.Sprintf("%v", err)),
+		return err,
 	}
 
 	go gh.Listen(config.Proxy)
 
 	select {
 	case ev := <-evChan:
-		log.Info(ev.String())
+		// run job based on event type
 	case err := <-errChan:
 		log.Error(fmt.Sprintf("%v", err))
-	default:
-		t.Errorf("Did not receive event or error")
-	}
+
+	return nil
 }

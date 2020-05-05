@@ -12,7 +12,7 @@ type Client struct {
 	EventChan chan Event
 	ErrorChan chan error
 
-	api          API
+	Api          API
 	cache        Cache
 	repositories map[string]*Repository
 }
@@ -20,7 +20,7 @@ type Client struct {
 // NewClient create a new github Client
 func NewClient(eventChan chan Event, errorChan chan error) Client {
 	return Client{
-		api:          NewAPI(),
+		Api:          NewAPI(),
 		repositories: make(map[string]*Repository),
 		cache:        NewCache(),
 		EventChan:    eventChan,
@@ -34,7 +34,7 @@ func (c *Client) UpdateStatus(repo Repository, commit Commit) error {
 	if err != nil {
 		return err
 	}
-	return c.api.PostStatus(repo.Owner.Login, repo.Name, commit.Sha, body)
+	return c.Api.PostStatus(repo.Owner.Login, repo.Name, commit.Sha, body)
 }
 
 // Listen listen on address for webhooks
@@ -54,6 +54,6 @@ func (c *Client) webhookHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		c.ErrorChan <- fmt.Errorf("Error in event payload: %s", err)
 	}
-	ev.handle(c, json)
+	ev.Handle(c, json)
 	c.EventChan <- ev
 }

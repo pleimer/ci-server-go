@@ -8,8 +8,13 @@ type Reference struct {
 	tail *Commit
 }
 
+// GetHead get head commit pointed at by ref
+func (r *Reference) GetHead() *Commit {
+	return r.head
+}
+
 // registerCommits register commits to reference
-func (r *Reference) register(incHead *Commit) {
+func (r *Reference) Register(incHead *Commit) {
 	// check for crossover between already registered commits and incoming commits.
 	// If none found, existing commits pointed to by ref are deleted and ref set to point
 	// to the incoming head. If duplicate parent found, children of the existing parent set to
