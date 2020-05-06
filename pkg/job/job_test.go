@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// TestPushJob simulate push event coming from github, test running the job
 func TestPushJob(t *testing.T) {
 	spec := &parser.Spec{
 		Global: &parser.Global{
@@ -26,9 +27,10 @@ func TestPushJob(t *testing.T) {
 		},
 		Script: []string{
 			"echo $OCP_PROJECT",
+			"pwd",
 		},
 		AfterScript: []string{
-			"echo Done",
+			"cat ci.yml",
 		},
 	}
 	content, _ := yaml.Marshal(spec)
@@ -104,8 +106,9 @@ func TestPushJob(t *testing.T) {
 		basePath: path,
 	}
 
-	if _, err := os.Stat(pj.basePath + "t0"); err == nil {
-		removeContents(pj.basePath + "t0")
+	if _, err := os.Stat("/tmp/t0"); err == nil {
+		removeContents("/tmp/t0")
+		os.RemoveAll("/tmp/t0")
 	}
 
 	errChan := make(chan error)

@@ -22,16 +22,20 @@ type Spec struct {
 	AfterScript []string `yaml:"after_script"`
 }
 
-func (s *Spec) ScriptCmd() *exec.Cmd {
-	return s.genEnv(s.Script)
+func (s *Spec) ScriptCmd(basePath string) *exec.Cmd {
+	cmd := s.genEnv(s.Script)
+	cmd.Dir = basePath
+	return cmd
 }
 
-func (s *Spec) AfterScriptCmd() *exec.Cmd {
-	return s.genEnv(s.AfterScript)
+func (s *Spec) AfterScriptCmd(basePath string) *exec.Cmd {
+	cmd := s.genEnv(s.AfterScript)
+	cmd.Dir = basePath
+	return cmd
 }
 
 func (s *Spec) genEnv(comList []string) *exec.Cmd {
-	cmdString := strings.Join(s.Script, ";")
+	cmdString := strings.Join(comList, ";")
 	cmd := exec.Command("bash", "-c", cmdString)
 	var newEnv []string
 	for key, val := range s.Global.Env {

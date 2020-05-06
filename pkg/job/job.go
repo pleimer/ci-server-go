@@ -35,6 +35,7 @@ func (p *PushJob) Run(errChan chan error) {
 		errChan <- err
 		return
 	}
+	p.basePath = p.basePath + tree.Path
 
 	// Read in spec
 	f, err := os.Open(p.yamlPath(tree))
@@ -50,7 +51,7 @@ func (p *PushJob) Run(errChan chan error) {
 	}
 
 	// run script with timeout
-	out, err := spec.ScriptCmd().Output()
+	out, err := spec.ScriptCmd(p.basePath).Output()
 	if err != nil {
 		errChan <- err
 		return
@@ -59,18 +60,17 @@ func (p *PushJob) Run(errChan chan error) {
 	fmt.Print(string(out))
 
 	// run after_script
-	out, err = spec.AfterScriptCmd().Output()
+	out, err = spec.AfterScriptCmd(p.basePath).Output()
 	if err != nil {
 		errChan <- err
 		return
 	}
-	fmt.Println(out)
-
+	fmt.Print(string(out))
 	//post gist
 
 }
 
 // helper functions
 func (p *PushJob) yamlPath(tree *ghclient.Tree) string {
-	return strings.Join([]string{p.basePath, tree.Path, "ci.yml"}, "/")
+	return strings.Join([]string{p.basePath, "ci.yml"}, "/")
 }
