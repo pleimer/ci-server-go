@@ -6,6 +6,19 @@ import (
 	"regexp"
 )
 
+type CommitState int
+
+const (
+	ERROR CommitState = iota
+	FAILURE
+	PENDING
+	SUCCESS
+)
+
+func (cs CommitState) String() string {
+	return [...]string{"error", "failure", "pending", "success"}[cs]
+}
+
 // Status github status object
 type Status struct {
 	State       string `json:"state"`
@@ -28,6 +41,18 @@ type Commit struct {
 	}
 	parent *Commit
 	child  *Commit
+}
+
+// SetContext set context of commit status
+func (c *Commit) SetContext(context string) {
+	c.Status.Context = context
+}
+
+// SetStatus sets status of commit with a message
+func (c *Commit) SetStatus(state CommitState, message string, targetURL string) {
+	c.Status.State = state.String()
+	c.Status.Description = message
+	c.Status.TargetURL = targetURL
 }
 
 // GetParent returns copy of parent commit

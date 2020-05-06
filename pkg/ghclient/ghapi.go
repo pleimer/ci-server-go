@@ -40,16 +40,35 @@ func (a *API) Authenticate(oauth io.Reader) error {
 
 // PostStatus sends post request to status
 func (a *API) PostStatus(owner, repo, commitSha string, body []byte) error {
-	res, err := a.post(a.statusURL(owner, repo, commitSha), body)
+	res, err := a.post(a.StatusURL(owner, repo, commitSha), body)
 	if err != nil {
 		return err
 	}
 	return assertCode(res, 201, "failed to update github status")
 }
 
+// PostGists sends post request to status
+func (a *API) PostGists(body []byte) ([]byte, error) {
+	res, err := a.post(a.GistURL(), body)
+	if err != nil {
+		return nil, err
+	}
+	info, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("while reading response to gist POST: %s", err)
+	}
+
+	err = assertCode(res, 201, "failed to post gist to github")
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
 // GetTree retrieve github tree
 func (a *API) GetTree(owner, repo, sha string) ([]byte, error) {
-	res, err := a.get(a.treeURL(owner, repo, sha))
+	res, err := a.get(a.TreeURL(owner, repo, sha))
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +82,7 @@ func (a *API) GetTree(owner, repo, sha string) ([]byte, error) {
 
 // GetBlob retrieve github tree
 func (a *API) GetBlob(owner, repo, sha string) ([]byte, error) {
-	res, err := a.get(a.blobURL(owner, repo, sha))
+	res, err := a.get(a.BlobURL(owner, repo, sha))
 	if err != nil {
 		return nil, err
 	}
@@ -93,16 +112,21 @@ func (a *API) post(URL string, body []byte) (*http.Response, error) {
 	return a.Client.Do(req)
 }
 
-func (a *API) statusURL(owner, repo, sha string) string {
+// StatusURL generates url for querying status
+func (a *API) StatusURL(owner, repo, sha string) string {
 	return a.makeURL([]string{"repos", owner, repo, "statuses", sha})
 }
 
-func (a *API) treeURL(owner, repo, treeSha string) string {
+func (a *API) TreeURL(owner, repo, treeSha string) string {
 	return a.makeURL([]string{"repos", owner, repo, "git", "trees", treeSha})
 }
 
-func (a *API) blobURL(owner, repo, fileSha string) string {
+func (a *API) BlobURL(owner, repo, fileSha string) string {
 	return a.makeURL([]string{"repos", owner, repo, "git", "blobs", fileSha})
+}
+
+func (a *API) GistURL() string {
+	return a.makeURL([]string{"gists"})
 }
 
 func (a *API) makeURL(items []string, params ...string) string {

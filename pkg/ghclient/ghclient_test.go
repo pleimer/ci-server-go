@@ -96,7 +96,7 @@ func TestUpdateStatus(t *testing.T) {
 		Api: api,
 	}
 
-	err := gh.UpdateStatus(repo, commit)
+	err := gh.UpdateCommitStatus(repo, commit)
 	assert.Ok(t, err)
 }
 
@@ -244,7 +244,7 @@ func TestGetTree(t *testing.T) {
 
 		gh := Client{
 			Api:   api,
-			cache: NewCache(),
+			Cache: NewCache(),
 		}
 
 		tree, err := gh.GetTree("t0", repo)
@@ -292,7 +292,7 @@ func TestGetTree(t *testing.T) {
 
 		gh := Client{
 			Api:   api,
-			cache: NewCache(),
+			Cache: NewCache(),
 		}
 
 		_, err = gh.GetTree("t0", repo)

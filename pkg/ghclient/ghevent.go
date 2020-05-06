@@ -74,6 +74,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 
 	refName := string(eventMap["ref"])
 	client.repositories[repo.Name].registerCommits(head, refName)
+	client.Cache.WriteCommits(head)
 
 	p.Repo = *repo
 	p.Ref = repo.GetReference(refName)

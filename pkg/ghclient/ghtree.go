@@ -133,36 +133,6 @@ func (b *Blob) Write(w io.Writer) error {
 	return fmt.Errorf("when writing blob %s to writer: %s", b.Sha, err)
 }
 
-//Cache one way cache for tracking github trees
-type Cache struct {
-	trees map[string]*Tree
-	blobs map[string]*Blob
-}
-
-//NewCache create cache
-func NewCache() Cache {
-	return Cache{
-		trees: make(map[string]*Tree),
-		blobs: make(map[string]*Blob),
-	}
-}
-
-func (c *Cache) GetBlob(sha string) *Blob {
-	return c.blobs[sha]
-}
-
-func (c *Cache) GetTree(sha string) *Tree {
-	return c.trees[sha]
-}
-
-func (c *Cache) WriteBlob(b *Blob) {
-	c.blobs[b.Sha] = b
-}
-
-func (c *Cache) WriteTree(t *Tree) {
-	c.trees[t.Sha] = t
-}
-
 func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) error {
 	if parent == nil {
 		return nil
@@ -171,7 +141,7 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 	for _, cRef := range treeMarsh.Tree {
 		switch cRef.Type {
 		case "blob":
-			child := c.cache.GetBlob(cRef.Sha)
+			child := c.Cache.GetBlob(cRef.Sha)
 			if child != nil {
 				parent.SetChild(child)
 				continue
@@ -189,11 +159,11 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 
 			child.Path = cRef.Path
 
-			c.cache.WriteBlob(child)
+			c.Cache.WriteBlob(child)
 			parent.SetChild(child)
 
 		case "tree":
-			child := c.cache.GetTree(cRef.Sha)
+			child := c.Cache.GetTree(cRef.Sha)
 			if child != nil {
 				parent.SetChild(child)
 				continue
@@ -211,7 +181,7 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 
 			child.Path = cRef.Path
 
-			c.cache.WriteTree(child)
+			c.Cache.WriteTree(child)
 			parent.SetChild(child)
 
 			err = json.Unmarshal(treeJSON, &treeMarsh)
@@ -230,7 +200,7 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 
 // GetTree checks cache for tree, else pulls tree from github
 func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
-	t := c.cache.GetTree(sha)
+	t := c.Cache.GetTree(sha)
 
 	if t != nil {
 		return t, nil
@@ -254,7 +224,7 @@ func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
 		children: []Node{},
 	}
 
-	c.cache.WriteTree(top)
+	c.Cache.WriteTree(top)
 	err = c.buildTree(top, treeMarsh, repo)
 	if err != nil {
 		return nil, err

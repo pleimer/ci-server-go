@@ -13,7 +13,7 @@ type Client struct {
 	ErrorChan chan error
 
 	Api          API
-	cache        Cache
+	Cache        Cache
 	repositories map[string]*Repository
 }
 
@@ -22,19 +22,28 @@ func NewClient(eventChan chan Event, errorChan chan error) Client {
 	return Client{
 		Api:          NewAPI(),
 		repositories: make(map[string]*Repository),
-		cache:        NewCache(),
+		Cache:        NewCache(),
 		EventChan:    eventChan,
 		ErrorChan:    errorChan,
 	}
 }
 
-// UpdateStatus update status of commit in repository
-func (c *Client) UpdateStatus(repo Repository, commit Commit) error {
-	body, err := json.Marshal(commit.Status)
+// UpdateCommitStatus update status of commit in repository
+func (c *Client) UpdateCommitStatus(repo Repository, commit Commit) error {
+	// update internally
+	cIn := c.Cache.GetCommit(commit.Sha)
+	if cIn == nil {
+		return fmt.Errorf("commit has not been indexed or previously initialized")
+	}
+
+	cIn.Status = commit.Status
+
+	// update remote
+	body, err := json.Marshal(cIn.Status)
 	if err != nil {
 		return err
 	}
-	return c.Api.PostStatus(repo.Owner.Login, repo.Name, commit.Sha, body)
+	return c.Api.PostStatus(repo.Owner.Login, repo.Name, cIn.Sha, body)
 }
 
 // Listen listen on address for webhooks

@@ -1,8 +1,8 @@
 package job
 
 import (
-	"bytes"
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -56,28 +56,24 @@ func TestPushJob(t *testing.T) {
 		},
 	}
 
-	serverRespBodies, err := ghclient.TreeServer(t0, repo)
+	serverResponses, err := ghclient.TreeServer(t0, repo)
 	assert.Ok(t, err)
 	client := ghclient.NewTestClient(func(req *http.Request) *http.Response {
-		respFn := serverRespBodies[req.URL.String()]
+		respFn := serverResponses[req.URL.String()]
+		// t.Log(req.URL.String())
 
 		if respFn == nil {
 			return &http.Response{
 				StatusCode: 404,
-				Status:     "404 Not Found",
+				Status:     fmt.Sprintf("404 Not Found. Location %s does not exist", req.URL.String()),
 				Body:       ioutil.NopCloser(strings.NewReader("not found")),
 				Header:     make(http.Header),
 			}
 		}
 
-		respBody, err := respFn()
+		resp, err := respFn(req)
 		assert.Ok(t, err)
-		return &http.Response{
-			StatusCode: 200,
-			Status:     "200 OK",
-			Body:       ioutil.NopCloser(bytes.NewReader(respBody)),
-			Header:     make(http.Header),
-		}
+		return resp
 	})
 
 	api := ghclient.NewAPI()
@@ -90,8 +86,35 @@ func TestPushJob(t *testing.T) {
 	commit := ghclient.Commit{
 		Sha: "t0",
 	}
+
+	// add server response to status Post requests
+	serverResponses[api.StatusURL(repo.Owner.Login, repo.Name, commit.Sha)] = func(req *http.Request) (*http.Response, error) {
+		// res, _ := ioutil.ReadAll(req.Body)
+		// t.Log(string(res))
+		return &http.Response{
+			StatusCode: 201,
+			Status:     "201 Created",
+			Body:       ioutil.NopCloser(strings.NewReader(req.URL.String())),
+			Header:     make(http.Header),
+		}, nil
+	}
+
+	// add server response to gist Post
+	serverResponses[api.GistURL()] = func(req *http.Request) (*http.Response, error) {
+		body := `{"url":"` + api.GistURL() + `/testgist"}`
+		res, _ := ioutil.ReadAll(req.Body)
+		t.Log(string(res))
+		return &http.Response{
+			StatusCode: 201,
+			Status:     "201 Created",
+			Body:       ioutil.NopCloser(strings.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
+	}
+
 	ref := ghclient.Reference{}
 	ref.Register(&commit)
+	gh.Cache.WriteCommits(&commit)
 
 	ev := ghclient.Push{
 		Repo: *repo,
