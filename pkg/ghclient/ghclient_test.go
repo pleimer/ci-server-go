@@ -93,8 +93,10 @@ func TestUpdateStatus(t *testing.T) {
 	api.Client = client
 
 	gh := Client{
-		Api: api,
+		Api:   api,
+		Cache: NewCache(),
 	}
+	gh.Cache.WriteCommits(&commit)
 
 	err := gh.UpdateCommitStatus(repo, commit)
 	assert.Ok(t, err)

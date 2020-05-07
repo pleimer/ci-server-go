@@ -28,7 +28,7 @@ func TestScriptCmd(t *testing.T) {
 	specUT, err := NewSpecFromYAML(in)
 	assert.Ok(t, err)
 
-	out, err := specUT.ScriptCmd().Output()
+	out, err := specUT.ScriptCmd("").Output()
 	assert.Ok(t, err)
 
 	assert.Equals(t, "stf\n", string(out))

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -22,21 +23,21 @@ type Spec struct {
 	AfterScript []string `yaml:"after_script"`
 }
 
-func (s *Spec) ScriptCmd(basePath string) *exec.Cmd {
-	cmd := s.genEnv(s.Script)
+func (s *Spec) ScriptCmd(ctx context.Context, basePath string) *exec.Cmd {
+	cmd := s.genEnv(ctx, s.Script)
 	cmd.Dir = basePath
 	return cmd
 }
 
-func (s *Spec) AfterScriptCmd(basePath string) *exec.Cmd {
-	cmd := s.genEnv(s.AfterScript)
+func (s *Spec) AfterScriptCmd(ctx context.Context, basePath string) *exec.Cmd {
+	cmd := s.genEnv(ctx, s.AfterScript)
 	cmd.Dir = basePath
 	return cmd
 }
 
-func (s *Spec) genEnv(comList []string) *exec.Cmd {
+func (s *Spec) genEnv(ctx context.Context, comList []string) *exec.Cmd {
 	cmdString := strings.Join(comList, ";")
-	cmd := exec.Command("bash", "-c", cmdString)
+	cmd := exec.CommandContext(ctx, "bash", "-c", cmdString)
 	var newEnv []string
 	for key, val := range s.Global.Env {
 		switch v := val.(type) {

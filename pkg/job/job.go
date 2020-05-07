@@ -1,124 +1,205 @@
 package job
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
+	"github.com/infrawatch/ci-server-go/pkg/logging"
 	"github.com/infrawatch/ci-server-go/pkg/parser"
 )
 
+// Job type the main server runs
 type Job interface {
-	Run(chan error)
+	Run(ctx context.Context)
+	SetLogger(*logging.Logger)
 }
 
+// Factory generate jobs based on event type
+func Factory(event ghclient.Event, client *ghclient.Client) (Job, error) {
+	switch e := event.(type) {
+	case *ghclient.Push:
+		l, err := logging.NewLogger(logging.ERROR, "console")
+		if err != nil {
+			return nil, err
+		}
+		return &PushJob{
+			event:  e,
+			client: client,
+			Log:    l,
+		}, nil
+	}
+	return nil, fmt.Errorf("could not determine github event type")
+}
+
+// PushJob contains logic for dealing with github push events
 type PushJob struct {
 	event             *ghclient.Push
 	client            *ghclient.Client
 	scriptOutput      []byte
 	afterScriptOutput []byte
 
-	basePath string
+	BasePath string
+	Log      *logging.Logger
 }
 
-func (p *PushJob) Run(errChan chan error) {
-	defer close(errChan)
-	// Get tree into filesystem
+// SetLogger impelements type job.Job
+func (p *PushJob) SetLogger(l *logging.Logger) {
+	p.Log = l
+}
+
+// Run ...
+func (p *PushJob) Run(ctx context.Context) {
 	commit := p.event.Ref.GetHead()
-	tree, err := p.client.GetTree(commit.Sha, p.event.Repo)
+	cj := newCoreJob(p.client, p.event.Repo, *commit, p.Log)
+	cj.BasePath = "/tmp/"
+
+	cj.getResources()
+	cj.runScript(ctx)
+	cj.runAfterScript(ctx)
+	cj.postResults()
+}
+
+// coreJob contains processes for the stages of running a script in a repository, generating and posting reports
+// getResources() must be run before both runScript() and runAfterScript()
+type coreJob struct {
+	client *ghclient.Client
+	repo   ghclient.Repository
+	commit ghclient.Commit
+
+	spec              *parser.Spec
+	scriptOutput      []byte
+	afterScriptOutput []byte
+
+	Log *logging.Logger
+
+	BasePath string
+}
+
+func newCoreJob(client *ghclient.Client, repo ghclient.Repository, commit ghclient.Commit, logger *logging.Logger) *coreJob {
+	return &coreJob{
+		client: client,
+		repo:   repo,
+		commit: commit,
+		Log:    logger,
+	}
+}
+
+func (cj *coreJob) getResources() {
+	tree, err := cj.client.GetTree(cj.commit.Sha, cj.repo)
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 		return
 	}
 
-	err = ghclient.WriteTreeToDirectory(tree, p.basePath)
+	err = ghclient.WriteTreeToDirectory(tree, cj.BasePath)
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 		return
 	}
-	p.basePath = p.basePath + tree.Path
+	cj.BasePath = cj.BasePath + tree.Path
 
 	// Read in spec
-	f, err := os.Open(p.yamlPath(tree))
+	f, err := os.Open(cj.yamlPath(tree))
 	defer f.Close()
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 		return
 	}
-	spec, err := parser.NewSpecFromYAML(f)
+	cj.spec, err = parser.NewSpecFromYAML(f)
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 		return
 	}
+}
 
-	// update status to pending
-	commit.SetContext("ci-server-go")
-	commit.SetStatus(ghclient.PENDING, "pending", "")
-	err = p.client.UpdateCommitStatus(p.event.Repo, *commit)
+func (cj *coreJob) setCommitPending() {
+	cj.commit.SetContext("ci-server-go")
+	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
+	err := cj.client.UpdateCommitStatus(cj.repo, cj.commit)
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 	}
+}
+
+func (cj *coreJob) runScript(ctx context.Context) error {
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*2)
+	defer cancel()
+	var err error
 
 	// run script with timeout
-	p.scriptOutput, err = spec.ScriptCmd(p.basePath).Output()
-	if err != nil {
-		commit.SetStatus(ghclient.ERROR, fmt.Sprintf("job failed with: %s", err), "")
-		errChan <- err
+	cj.scriptOutput, err = cj.spec.ScriptCmd(ctxTimeout, cj.BasePath).Output()
+	if ctxTimeout.Err() != nil {
+		cj.Log.Error(ctxTimeout.Err().Error())
+		cj.commit.SetStatus(ghclient.ERROR, "main script timed out", "")
+		return ctxTimeout.Err()
 	}
 
-	// run after_script
-	p.afterScriptOutput, err = spec.AfterScriptCmd(p.basePath).Output()
 	if err != nil {
-		commit.SetStatus(ghclient.ERROR, fmt.Sprintf("after_script failed with: %s", err), "")
-		errChan <- err
+		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("job failed with: %s", err), "")
+		cj.Log.Error(err.Error())
+		return err
 	}
+	return nil
+}
 
+func (cj *coreJob) runAfterScript(ctx context.Context) {
+	var err error
+	cj.afterScriptOutput, err = cj.spec.AfterScriptCmd(ctx, cj.BasePath).Output()
+	if err != nil {
+		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("after_script failed with: %s", err), "")
+		cj.Log.Error(err.Error())
+	}
+}
+
+func (cj *coreJob) postResults() {
 	//post gist
-	report := string(p.buildReport())
+	report := string(cj.buildReport())
 	gist := ghclient.NewGist()
-	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", p.event.Repo.Name, commit.Sha)
-	gist.AddFile(fmt.Sprintf("%s_%s.md", p.event.Repo.Name, commit.Sha), report)
+	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", cj.repo.Name, cj.commit.Sha)
+	gist.AddFile(fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha), report)
 	gJSON, err := json.Marshal(gist)
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 	}
 
-	res, err := p.client.Api.PostGists(gJSON)
+	res, err := cj.client.Api.PostGists(gJSON)
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 	}
 
 	// get gist target url
 	resMap := make(map[string]interface{})
 	err = json.Unmarshal(res, &resMap)
 	if err != nil {
-		errChan <- fmt.Errorf("while unmarshalling gist response: %s", err)
+		cj.Log.Error(fmt.Sprintf("while unmarshalling gist response: %s", err))
 	}
 
 	targetURL := resMap["url"].(string)
 
 	// update status of commit
-	commit.SetStatus(ghclient.SUCCESS, "all jobs passed", targetURL)
-	err = p.client.UpdateCommitStatus(p.event.Repo, *commit)
+	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", targetURL)
+	err = cj.client.UpdateCommitStatus(cj.repo, cj.commit)
 	if err != nil {
-		errChan <- err
+		cj.Log.Error(err.Error())
 	}
-
 }
 
-func (p *PushJob) buildReport() []byte {
+func (cj *coreJob) buildReport() []byte {
 	var sb strings.Builder
 	sb.WriteString("## Script Results\n```")
-	sb.Write(p.scriptOutput)
+	sb.Write(cj.scriptOutput)
 	sb.WriteString("```\n## After Script Results\n```\n")
-	sb.Write(p.afterScriptOutput)
+	sb.Write(cj.afterScriptOutput)
 	sb.WriteString("```")
 	return []byte(sb.String())
 }
 
 // helper functions
-func (p *PushJob) yamlPath(tree *ghclient.Tree) string {
-	return strings.Join([]string{p.basePath, "ci.yml"}, "/")
+func (cj *coreJob) yamlPath(tree *ghclient.Tree) string {
+	return strings.Join([]string{cj.BasePath, "ci.yml"}, "/")
 }

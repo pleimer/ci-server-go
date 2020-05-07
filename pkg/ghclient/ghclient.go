@@ -33,7 +33,7 @@ func (c *Client) UpdateCommitStatus(repo Repository, commit Commit) error {
 	// update internally
 	cIn := c.Cache.GetCommit(commit.Sha)
 	if cIn == nil {
-		return fmt.Errorf("commit has not been indexed or previously initialized")
+		return fmt.Errorf("ghclient - commit has not been indexed or previously initialized")
 	}
 
 	cIn.Status = commit.Status

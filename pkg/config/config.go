@@ -19,7 +19,7 @@ func NewConfig() (*Config, error) {
 	}
 
 	if c.Organization == "" {
-		return nil, fmt.Errorf("organization not specified by ORGANIZATION environemental variable")
+		return nil, fmt.Errorf("organization not specified by ORGANIZATION environmental variable")
 	}
 
 	if c.Organization == "" {
