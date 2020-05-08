@@ -10,12 +10,6 @@ import (
 	"github.com/infrawatch/ci-server-go/pkg/logging"
 )
 
-// Job type the main server runs
-type Job interface {
-	Run(context.Context, *sync.WaitGroup)
-	SetLogger(*logging.Logger)
-}
-
 // Factory generate jobs based on event type
 func Factory(event ghclient.Event, client *ghclient.Client) (Job, error) {
 	switch e := event.(type) {
