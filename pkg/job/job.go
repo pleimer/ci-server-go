@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
@@ -15,7 +16,7 @@ import (
 
 // Job type the main server runs
 type Job interface {
-	Run(ctx context.Context)
+	Run(context.Context, *sync.WaitGroup)
 	SetLogger(*logging.Logger)
 }
 
@@ -53,14 +54,26 @@ func (p *PushJob) SetLogger(l *logging.Logger) {
 }
 
 // Run ...
-func (p *PushJob) Run(ctx context.Context) {
+func (p *PushJob) Run(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	commit := p.event.Ref.GetHead()
 	cj := newCoreJob(p.client, p.event.Repo, *commit, p.Log)
 	cj.BasePath = "/tmp/"
 
 	cj.getResources()
-	cj.runScript(ctx)
-	cj.runAfterScript(ctx)
+	ctxTimeoutScript, cancelScript := context.WithTimeout(ctx, time.Second*300)
+	defer cancelScript()
+	cj.runScript(ctxTimeoutScript)
+
+	// It is highly NOT recommended to create top level contexts in lower functions
+	// 'After script' is responsible for cleaning up resources, so it must run even when a cancel signal
+	// has been sent by the main server goroutine. This still garauntees an exit after timeout
+	// so it isn't too terrible
+	ctxTimeoutAfterScrip, cancelAfterScript := context.WithTimeout(context.Background(), time.Second)
+	defer cancelAfterScript()
+	cj.runAfterScript(ctxTimeoutAfterScrip)
+
 	cj.postResults()
 }
 
@@ -117,9 +130,9 @@ func (cj *coreJob) getResources() {
 	}
 }
 
-func (cj *coreJob) setCommitPending() {
+func (cj *coreJob) setCommitStatus(state ghclient.CommitState, message, targetURL string) {
 	cj.commit.SetContext("ci-server-go")
-	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
+	cj.commit.SetStatus(state, message, targetURL)
 	err := cj.client.UpdateCommitStatus(cj.repo, cj.commit)
 	if err != nil {
 		cj.Log.Error(err.Error())
@@ -127,16 +140,14 @@ func (cj *coreJob) setCommitPending() {
 }
 
 func (cj *coreJob) runScript(ctx context.Context) error {
-	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*2)
-	defer cancel()
 	var err error
 
 	// run script with timeout
-	cj.scriptOutput, err = cj.spec.ScriptCmd(ctxTimeout, cj.BasePath).Output()
-	if ctxTimeout.Err() != nil {
-		cj.Log.Error(ctxTimeout.Err().Error())
-		cj.commit.SetStatus(ghclient.ERROR, "main script timed out", "")
-		return ctxTimeout.Err()
+	cj.scriptOutput, err = cj.spec.ScriptCmd(ctx, cj.BasePath).Output()
+	if ctx.Err() != nil {
+		cj.Log.Error(ctx.Err().Error())
+		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("main script failed: %s", ctx.Err().Error()), "")
+		return ctx.Err()
 	}
 
 	if err != nil {
@@ -147,16 +158,25 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 	return nil
 }
 
-func (cj *coreJob) runAfterScript(ctx context.Context) {
+func (cj *coreJob) runAfterScript(ctx context.Context) error {
 	var err error
 	cj.afterScriptOutput, err = cj.spec.AfterScriptCmd(ctx, cj.BasePath).Output()
-	if err != nil {
-		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("after_script failed with: %s", err), "")
-		cj.Log.Error(err.Error())
+
+	if ctx.Err() != nil {
+		cj.Log.Error(ctx.Err().Error())
+		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("after_script failed: %s", ctx.Err().Error()), "")
+		return ctx.Err()
 	}
+
+	if err != nil {
+		cj.Log.Error(err.Error())
+		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("job failed with: %s", err), "")
+		return err
+	}
+	return nil
 }
 
-func (cj *coreJob) postResults() {
+func (cj *coreJob) postResults() string {
 	//post gist
 	report := string(cj.buildReport())
 	gist := ghclient.NewGist()
@@ -179,22 +199,21 @@ func (cj *coreJob) postResults() {
 		cj.Log.Error(fmt.Sprintf("while unmarshalling gist response: %s", err))
 	}
 
-	targetURL := resMap["url"].(string)
-
-	// update status of commit
-	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", targetURL)
-	err = cj.client.UpdateCommitStatus(cj.repo, cj.commit)
-	if err != nil {
-		cj.Log.Error(err.Error())
-	}
+	return resMap["url"].(string)
 }
 
 func (cj *coreJob) buildReport() []byte {
 	var sb strings.Builder
 	sb.WriteString("## Script Results\n```")
 	sb.Write(cj.scriptOutput)
+	if len(cj.scriptOutput) == 0 {
+		sb.WriteString("\n")
+	}
 	sb.WriteString("```\n## After Script Results\n```\n")
 	sb.Write(cj.afterScriptOutput)
+	if len(cj.afterScriptOutput) == 0 {
+		sb.WriteString("\n")
+	}
 	sb.WriteString("```")
 	return []byte(sb.String())
 }
