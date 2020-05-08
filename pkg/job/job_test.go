@@ -245,12 +245,10 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	ref.Register(&commit)
 	gh.Cache.WriteCommits(&commit)
 
-	// Create PushJob
-
 	// add server response to status Post requests
 	serverResponses[gh.Api.StatusURL(repo.Owner.Login, repo.Name, commit.Sha)] = func(req *http.Request) (*http.Response, error) {
 		// res, _ := ioutil.ReadAll(req.Body)
-		// t.Log(string(res))
+		// fmt.Println(string(res))
 		return &http.Response{
 			StatusCode: 201,
 			Status:     "201 Created",

@@ -17,6 +17,7 @@ const (
 	INFO
 	WARN
 	ERROR
+	NONE
 )
 
 func (l LogLevel) String() string {
