@@ -13,7 +13,9 @@ import (
 )
 
 // Run server main function
-func Run() {
+func Run(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	log, err := logging.NewLogger(logging.INFO, "console")
 	if err != nil {
 		log.Error(err.Error())
@@ -21,7 +23,9 @@ func Run() {
 	}
 	log.Timestamp = true
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	defer log.Destroy()
 
 	config, err := config.NewConfig()
@@ -40,10 +44,12 @@ func Run() {
 		return
 	}
 
-	var wg *sync.WaitGroup
 	wg.Add(1)
 	server := gh.Listen(wg, config.Proxy)
 	log.Info(fmt.Sprintf("listening on %s for webhooks", config.Proxy))
+	if err := server.Shutdown(ctx); err != nil {
+		log.Error(fmt.Sprintf("error shutting down server gracefully: %s", err))
+	}
 
 	jobChan := make(chan job.Job)
 
@@ -62,11 +68,8 @@ func Run() {
 
 	case err := <-errChan:
 		log.Error(fmt.Sprintf("%v", err))
-		// TODO exit here
+		cancel()
+	case <-ctx.Done():
+		log.Info("server cleaning up resources")
 	}
-
-	if err := server.Shutdown(ctx); err != nil {
-		log.Error(fmt.Sprintf("error shutting down server gracefully: %s", err))
-	}
-	wg.Wait()
 }

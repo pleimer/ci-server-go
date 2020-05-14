@@ -35,6 +35,7 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 
 	workChan := make(chan job.Job)
 	for w := 0; w < jb.numWorkers; w++ {
+		jb.log.Info(fmt.Sprintf("created worker #%d", w))
 		wg.Add(1)
 		go jb.worker(ctx, wg, w, workChan)
 	}
@@ -45,6 +46,9 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 			runningJob.Cancel()
 		}
 		workChan <- j
+	case <-ctx.Done():
+		jb.log.Info("job manager exited")
+		return
 	}
 }
 
@@ -52,7 +56,7 @@ func (jb *JobManager) worker(ctx context.Context, wg *sync.WaitGroup, num int, j
 	defer wg.Done()
 	select {
 	case <-ctx.Done():
-		jb.log.Info(fmt.Sprintf("worker #%s exited", num))
+		jb.log.Info(fmt.Sprintf("worker #%d exited", num))
 		return
 	case j := <-job:
 		jb.runningJobs[j.GetRefName()] = j

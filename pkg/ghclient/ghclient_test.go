@@ -107,7 +107,7 @@ func TestListen(t *testing.T) {
 	errChan := make(chan error, 10)
 	gh := NewClient(eventChan, errChan)
 
-	go gh.Listen(":8888")
+	go gh.Listen(nil, ":8888")
 	req, _ := http.NewRequest("POST", "http://127.0.0.1:8888/webhook", strings.NewReader(`{payload:"payload"}`))
 
 	time.Sleep(time.Second)

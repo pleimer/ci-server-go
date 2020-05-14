@@ -26,5 +26,5 @@ func Factory(event ghclient.Event, client *ghclient.Client, log *logging.Logger)
 			Log:    log,
 		}, nil
 	}
-	return nil, fmt.Errorf("could not determine github event type")
+	return nil, fmt.Errorf("failed creating job: could not determine github event type")
 }

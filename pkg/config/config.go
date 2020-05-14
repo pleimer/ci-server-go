@@ -22,7 +22,7 @@ func NewConfig() (*Config, error) {
 		return nil, fmt.Errorf("organization not specified by ORGANIZATION environmental variable")
 	}
 
-	if c.Organization == "" {
+	if c.Oauth == "" {
 		return nil, fmt.Errorf("oauth token not specified by OAUTH environemental variable")
 	}
 
