@@ -11,8 +11,11 @@ import (
 )
 
 // JobManager manages set number of parallel running jobs and queues up extra
-// incoming jobs
+// incoming jobs.
 type JobManager struct {
+	// once a job begins running, it is subject to cancellation on the following events:
+	// 1) if a job targeted at the same github Ref arrives (in this case, it is replaced)
+	// 2) if the parent context cancel function is called
 	runningJobs map[string]job.Job
 	jobQueue    *queue.PriorityQueue
 	log         *logging.Logger

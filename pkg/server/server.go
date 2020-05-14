@@ -43,6 +43,7 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 		log.Error(err.Error())
 		return
 	}
+	log.Info("successfully authenticated with oauth token")
 
 	wg.Add(1)
 	server := gh.Listen(wg, config.Proxy)
