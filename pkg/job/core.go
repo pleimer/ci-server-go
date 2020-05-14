@@ -39,6 +39,9 @@ func newCoreJob(client *ghclient.Client, repo ghclient.Repository, commit ghclie
 	return &cj
 }
 
+// gather resources needed to run any of the core functions
+// specifically, download the tree and gather the spec from
+// the yaml file
 func (cj *coreJob) getResources() {
 	tree, err := cj.client.GetTree(cj.commit.Sha, cj.repo)
 	if err != nil {
@@ -67,15 +70,7 @@ func (cj *coreJob) getResources() {
 	}
 }
 
-func (cj *coreJob) postCommitStatus() error {
-	err := cj.client.UpdateCommitStatus(cj.repo, cj.commit)
-	if err != nil {
-		cj.Log.Info(err.Error())
-		return err
-	}
-	return nil
-}
-
+// runs spec.Script
 func (cj *coreJob) runScript(ctx context.Context) error {
 	var err error
 
@@ -99,6 +94,7 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 	return nil
 }
 
+// runs spec.AfterScript
 func (cj *coreJob) runAfterScript(ctx context.Context) error {
 	var err error
 	cj.afterScriptOutput, err = cj.spec.AfterScriptCmd(ctx, cj.BasePath).Output()
@@ -117,6 +113,7 @@ func (cj *coreJob) runAfterScript(ctx context.Context) error {
 	return nil
 }
 
+// post commit status and gist report to github client
 func (cj *coreJob) postResults() {
 	//post gist
 	report := string(cj.buildReport())
@@ -145,6 +142,12 @@ func (cj *coreJob) postResults() {
 	cj.postCommitStatus()
 }
 
+// ----------- helper functions ---------------
+func (cj *coreJob) yamlPath(tree *ghclient.Tree) string {
+	return strings.Join([]string{cj.BasePath, "ci.yml"}, "/")
+}
+
+// build report in markdown format
 func (cj *coreJob) buildReport() []byte {
 	var sb strings.Builder
 	sb.WriteString("## Script Results\n```")
@@ -161,7 +164,12 @@ func (cj *coreJob) buildReport() []byte {
 	return []byte(sb.String())
 }
 
-// helper functions
-func (cj *coreJob) yamlPath(tree *ghclient.Tree) string {
-	return strings.Join([]string{cj.BasePath, "ci.yml"}, "/")
+// helper function post commit status to gh client
+func (cj *coreJob) postCommitStatus() error {
+	err := cj.client.UpdateCommitStatus(cj.repo, cj.commit)
+	if err != nil {
+		cj.Log.Info(err.Error())
+		return err
+	}
+	return nil
 }

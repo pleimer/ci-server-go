@@ -197,7 +197,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	}
 	t0.SetChild(b1)
 
-	log, err := logging.NewLogger(logging.DEBUG, "console")
+	log, err := logging.NewLogger(logging.NONE, "console")
 	if err != nil {
 		panic(err)
 	}
