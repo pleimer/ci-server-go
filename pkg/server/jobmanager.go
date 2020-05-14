@@ -75,6 +75,8 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 }
 
 func (jb *JobManager) worker(ctx context.Context, wg *sync.WaitGroup, num int, job <-chan job.Job) {
+	// worker will not immediately exit when context is cancelled until the job completes its cancel sequence
+	// this is to enforce worker number limits
 	defer wg.Done()
 	select {
 	case <-ctx.Done():

@@ -20,6 +20,7 @@ type PushJob struct {
 
 	BasePath string
 	Log      *logging.Logger
+	Status   Status
 }
 
 // SetLogger impelements type job.Job
@@ -44,6 +45,7 @@ func (p *PushJob) Compare(other queue.Item) int {
 
 // Run ...
 func (p *PushJob) Run(ctx context.Context) {
+	p.Status = RUNNING
 	commit := p.event.Ref.GetHead()
 	cj := newCoreJob(p.client, p.event.Repo, *commit, p.Log)
 	cj.BasePath = "/tmp/"
@@ -53,7 +55,7 @@ func (p *PushJob) Run(ctx context.Context) {
 	ctxTimeoutScript, cancelScript := context.WithTimeout(ctx, time.Second*300)
 	p.cancel = cancelScript
 	defer cancelScript()
-	cj.runScript(ctxTimeoutScript)
+	p.handleContextError(cj.runScript(ctxTimeoutScript))
 
 	// It is highly NOT recommended to create top level contexts in lower functions
 	// 'After script' is responsible for cleaning up resources, so it must run even when a cancel signal
@@ -61,6 +63,16 @@ func (p *PushJob) Run(ctx context.Context) {
 	// so it isn't too terrible
 	ctxTimeoutAfterScrip, cancelAfterScript := context.WithTimeout(context.Background(), time.Second)
 	defer cancelAfterScript()
-	cj.runAfterScript(ctxTimeoutAfterScrip)
+	p.handleContextError(cj.runAfterScript(ctxTimeoutAfterScrip))
 	cj.postResults()
+	p.Status = COMPLETE
+}
+
+func (p *PushJob) handleContextError(err error) {
+	switch err {
+	case context.DeadlineExceeded:
+		p.Status = TIMEDOUT
+	case context.Canceled:
+		p.Status = CANCELED
+	}
 }

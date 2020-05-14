@@ -9,6 +9,21 @@ import (
 	"github.com/infrawatch/ci-server-go/pkg/logging"
 )
 
+//Status indicates current status of job
+type Status int
+
+// job status types
+const (
+	RUNNING Status = iota
+	COMPLETE
+	CANCELED
+	TIMEDOUT
+)
+
+func (js Status) String() string {
+	return [...]string{"COMPLETE", "CANCELED", "TIMEDOUT"}[js]
+}
+
 // Job type contains sequence of actions for different scenarios
 type Job interface {
 	GetRefName() string

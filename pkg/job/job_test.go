@@ -67,9 +67,8 @@ func TestPushJob(t *testing.T) {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
-
-		go pj.Run(ctx)
 		cancel()
+		pj.Run(ctx)
 		expGistStr := formatGistOutput(repo.Name, commit.Sha, "", "Done")
 		assert.Equals(t, expGistStr, gistString)
 	})
@@ -198,7 +197,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	}
 	t0.SetChild(b1)
 
-	log, err := logging.NewLogger(logging.NONE, "console")
+	log, err := logging.NewLogger(logging.DEBUG, "console")
 	if err != nil {
 		panic(err)
 	}
