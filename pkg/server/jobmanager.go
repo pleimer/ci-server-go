@@ -23,7 +23,7 @@ type JobManager struct {
 func NewJobManager(numWorkers int, log *logging.Logger) *JobManager {
 	return &JobManager{
 		runningJobs: make(map[string]job.Job),
-		jobQueue:    queue.NewPriorityQueue(0),
+		jobQueue:    queue.NewPriorityQueue(1000),
 		log:         log,
 		numWorkers:  numWorkers,
 	}
@@ -40,13 +40,32 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 		go jb.worker(ctx, wg, w, workChan)
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			items, err := jb.jobQueue.Get(1)
+			if err != nil {
+				jb.log.Info("job queue disposed") //only one type of error can happen here
+				return
+			}
+			job, ok := items[0].(job.Job)
+			if !ok {
+				jb.log.Error(fmt.Sprintf("while retrieving job from job queue: got data of type %T but wanted type job.Job", job))
+				continue
+			}
+			workChan <- job
+		}
+	}()
+
 	select {
 	case j := <-jobChan:
 		if runningJob, ok := jb.runningJobs[j.GetRefName()]; ok {
 			runningJob.Cancel()
 		}
-		workChan <- j
+		jb.jobQueue.Put(j)
 	case <-ctx.Done():
+		jb.jobQueue.Dispose()
 		jb.log.Info("job manager exited")
 		return
 	}

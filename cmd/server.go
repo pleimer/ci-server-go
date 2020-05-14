@@ -31,4 +31,5 @@ func main() {
 
 	server.Run(ctx, &wg)
 	wg.Wait()
+	// Print log of successful exit right here
 }

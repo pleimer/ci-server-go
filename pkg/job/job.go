@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
 	"github.com/infrawatch/ci-server-go/pkg/logging"
 )
@@ -13,6 +14,7 @@ type Job interface {
 	GetRefName() string
 	Run(context.Context)
 	Cancel()
+	Compare(queue.Item) int
 	SetLogger(*logging.Logger)
 }
 

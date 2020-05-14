@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
 	"github.com/infrawatch/ci-server-go/pkg/logging"
 )
@@ -34,6 +35,11 @@ func (p *PushJob) Cancel() {
 // GetRefName get reference name from event that triggered job
 func (p *PushJob) GetRefName() string {
 	return p.event.RefName
+}
+
+// Compare implements queue.Item
+func (p *PushJob) Compare(other queue.Item) int {
+	return 0
 }
 
 // Run ...
