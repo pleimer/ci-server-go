@@ -3,7 +3,6 @@ package job
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
 	"github.com/infrawatch/ci-server-go/pkg/logging"
@@ -11,22 +10,20 @@ import (
 
 // Job type contains sequence of actions for different scenarios
 type Job interface {
-	Run(context.Context, *sync.WaitGroup)
+	GetRefName() string
+	Run(context.Context)
+	Cancel()
 	SetLogger(*logging.Logger)
 }
 
 // Factory generate jobs based on event type
-func Factory(event ghclient.Event, client *ghclient.Client) (Job, error) {
+func Factory(event ghclient.Event, client *ghclient.Client, log *logging.Logger) (Job, error) {
 	switch e := event.(type) {
 	case *ghclient.Push:
-		l, err := logging.NewLogger(logging.ERROR, "console")
-		if err != nil {
-			return nil, err
-		}
 		return &PushJob{
 			event:  e,
 			client: client,
-			Log:    l,
+			Log:    log,
 		}, nil
 	}
 	return nil, fmt.Errorf("could not determine github event type")

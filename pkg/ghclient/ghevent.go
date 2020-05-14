@@ -26,8 +26,9 @@ func EventFactory(incoming string) (Event, error) {
 
 // Push implements github Event interface
 type Push struct {
-	Ref  Reference
-	Repo Repository
+	Ref     Reference
+	RefName string
+	Repo    Repository
 }
 
 func (p *Push) Handle(client *Client, pushJSON []byte) error {
@@ -73,6 +74,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	cSlice = nil
 
 	refName := string(eventMap["ref"])
+	p.RefName = refName
 	client.repositories[repo.Name].registerCommits(head, refName)
 	client.Cache.WriteCommits(head)
 

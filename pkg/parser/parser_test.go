@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/infrawatch/ci-server-go/pkg/assert"
@@ -28,7 +29,7 @@ func TestScriptCmd(t *testing.T) {
 	specUT, err := NewSpecFromYAML(in)
 	assert.Ok(t, err)
 
-	out, err := specUT.ScriptCmd("").Output()
+	out, err := specUT.ScriptCmd(context.Background(), "").Output()
 	assert.Ok(t, err)
 
 	assert.Equals(t, "stf\n", string(out))

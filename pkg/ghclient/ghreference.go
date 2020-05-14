@@ -13,12 +13,12 @@ func (r *Reference) GetHead() *Commit {
 	return r.head
 }
 
-// registerCommits register commits to reference
+// Register register commits to reference
 func (r *Reference) Register(incHead *Commit) {
 	// check for crossover between already registered commits and incoming commits.
 	// If none found, existing commits pointed to by ref are deleted and ref set to point
 	// to the incoming head. If duplicate parent found, children of the existing parent set to
-	// to root parent of incHead
+	// to root parent of incoming head
 
 	var incTail *Commit
 	for c := incHead; c != nil; c = c.parent {

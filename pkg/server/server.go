@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/infrawatch/ci-server-go/pkg/config"
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
@@ -17,6 +19,9 @@ func Run() {
 		log.Error(err.Error())
 		return
 	}
+	log.Timestamp = true
+
+	ctx := context.Background()
 	defer log.Destroy()
 
 	config, err := config.NewConfig()
@@ -25,7 +30,7 @@ func Run() {
 		return
 	}
 
-	evChan := make(chan ghclient.Event, 4)
+	evChan := make(chan ghclient.Event)
 	errChan := make(chan error)
 
 	gh := ghclient.NewClient(evChan, errChan)
@@ -35,20 +40,33 @@ func Run() {
 		return
 	}
 
-	log.Info(fmt.Sprintf("Listening on %s for webhooks", config.Proxy))
-	go gh.Listen(config.Proxy)
+	var wg *sync.WaitGroup
+	wg.Add(1)
+	server := gh.Listen(wg, config.Proxy)
+	log.Info(fmt.Sprintf("listening on %s for webhooks", config.Proxy))
+
+	jobChan := make(chan job.Job)
+
+	jobManager := NewJobManager(4, log)
+	wg.Add(1)
+	go jobManager.Run(ctx, wg, jobChan)
 
 	select {
 	case ev := <-evChan:
-		// run job based on event type
-		j, err := job.Factory(ev, &gh)
+		j, err := job.Factory(ev, &gh, log)
 		if err != nil {
 			log.Error(err.Error())
 			break
 		}
-		j.SetLogger(log)
-		go j.Run()
+		jobChan <- j
+
 	case err := <-errChan:
 		log.Error(fmt.Sprintf("%v", err))
+		// TODO exit here
 	}
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Error(fmt.Sprintf("error shutting down server gracefully: %s", err))
+	}
+	wg.Wait()
 }

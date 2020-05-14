@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 )
 
 // Client github client object
@@ -47,22 +48,27 @@ func (c *Client) UpdateCommitStatus(repo Repository, commit Commit) error {
 }
 
 // Listen listen on address for webhooks
-func (c *Client) Listen(address string) error {
-	http.HandleFunc("/webhook", c.webhookHandler)
-	return http.ListenAndServe(address, nil)
-}
+func (c *Client) Listen(wg *sync.WaitGroup, address string) *http.Server {
+	srv := &http.Server{Addr: address}
+	http.HandleFunc("/webhook", func(w http.ResponseWriter, req *http.Request) {
+		ev, err := EventFactory(req.Header.Get("X-Github-Event"))
+		if err != nil {
+			c.ErrorChan <- err
+			return
+		}
+		json, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			c.ErrorChan <- fmt.Errorf("Error in event payload: %s", err)
+		}
+		ev.Handle(c, json)
+		c.EventChan <- ev
+	})
 
-func (c *Client) webhookHandler(w http.ResponseWriter, req *http.Request) {
-	ev, err := EventFactory(req.Header.Get("X-Github-Event"))
-	if err != nil {
-		c.ErrorChan <- err
-		return
-	}
-
-	json, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		c.ErrorChan <- fmt.Errorf("Error in event payload: %s", err)
-	}
-	ev.Handle(c, json)
-	c.EventChan <- ev
+	go func() {
+		defer wg.Done()
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			c.ErrorChan <- fmt.Errorf("while listening on address %s: %s", address, err)
+		}
+	}()
+	return srv
 }

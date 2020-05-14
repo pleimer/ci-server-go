@@ -2,30 +2,11 @@ package job
 
 import (
 	"context"
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
 	"github.com/infrawatch/ci-server-go/pkg/logging"
 )
-
-// Factory generate jobs based on event type
-func Factory(event ghclient.Event, client *ghclient.Client) (Job, error) {
-	switch e := event.(type) {
-	case *ghclient.Push:
-		l, err := logging.NewLogger(logging.ERROR, "console")
-		if err != nil {
-			return nil, err
-		}
-		return &PushJob{
-			event:  e,
-			client: client,
-			Log:    l,
-		}, nil
-	}
-	return nil, fmt.Errorf("could not determine github event type")
-}
 
 // PushJob contains logic for dealing with github push events
 type PushJob struct {
@@ -33,6 +14,8 @@ type PushJob struct {
 	client            *ghclient.Client
 	scriptOutput      []byte
 	afterScriptOutput []byte
+
+	cancel context.CancelFunc
 
 	BasePath string
 	Log      *logging.Logger
@@ -43,10 +26,18 @@ func (p *PushJob) SetLogger(l *logging.Logger) {
 	p.Log = l
 }
 
-// Run ...
-func (p *PushJob) Run(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+// Cancel used to manually cancel job if context does no cancel first
+func (p *PushJob) Cancel() {
+	p.cancel()
+}
 
+// GetRefName get reference name from event that triggered job
+func (p *PushJob) GetRefName() string {
+	return p.event.RefName
+}
+
+// Run ...
+func (p *PushJob) Run(ctx context.Context) {
 	commit := p.event.Ref.GetHead()
 	cj := newCoreJob(p.client, p.event.Repo, *commit, p.Log)
 	cj.BasePath = "/tmp/"
@@ -54,6 +45,7 @@ func (p *PushJob) Run(ctx context.Context, wg *sync.WaitGroup) {
 	cj.getResources()
 
 	ctxTimeoutScript, cancelScript := context.WithTimeout(ctx, time.Second*300)
+	p.cancel = cancelScript
 	defer cancelScript()
 	cj.runScript(ctxTimeoutScript)
 

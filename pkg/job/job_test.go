@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -45,9 +44,7 @@ func TestPushJob(t *testing.T) {
 			Log:      log,
 		}
 
-		var wg sync.WaitGroup
-		wg.Add(1)
-		pj.Run(context.Background(), &wg)
+		pj.Run(context.Background())
 		expGistStr := formatGistOutput(repo.Name, commit.Sha, "stf", "Done")
 		assert.Equals(t, expGistStr, gistString)
 	})
@@ -71,11 +68,8 @@ func TestPushJob(t *testing.T) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go pj.Run(ctx, &wg)
+		go pj.Run(ctx)
 		cancel()
-		wg.Wait()
 		expGistStr := formatGistOutput(repo.Name, commit.Sha, "", "Done")
 		assert.Equals(t, expGistStr, gistString)
 	})
@@ -204,7 +198,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	}
 	t0.SetChild(b1)
 
-	log, err := logging.NewLogger(logging.INFO, "console")
+	log, err := logging.NewLogger(logging.NONE, "console")
 	if err != nil {
 		panic(err)
 	}
