@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync"
+
+	"github.com/infrawatch/ci-server-go/pkg/logging"
 )
 
 // Client github client object
@@ -19,13 +21,12 @@ type Client struct {
 }
 
 // NewClient create a new github Client
-func NewClient(eventChan chan Event, errorChan chan error) Client {
+func NewClient(eventChan chan Event) Client {
 	return Client{
 		Api:          NewAPI(),
 		repositories: make(map[string]*Repository),
 		Cache:        NewCache(),
 		EventChan:    eventChan,
-		ErrorChan:    errorChan,
 	}
 }
 
@@ -48,7 +49,7 @@ func (c *Client) UpdateCommitStatus(repo Repository, commit Commit) error {
 }
 
 // Listen listen on address for webhooks
-func (c *Client) Listen(wg *sync.WaitGroup, address string) *http.Server {
+func (c *Client) Listen(wg *sync.WaitGroup, address string, log *logging.Logger) *http.Server {
 	srv := &http.Server{Addr: address}
 	http.HandleFunc("/webhook", func(w http.ResponseWriter, req *http.Request) {
 		ev, err := EventFactory(req.Header.Get("X-Github-Event"))
@@ -58,7 +59,7 @@ func (c *Client) Listen(wg *sync.WaitGroup, address string) *http.Server {
 		}
 		json, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			c.ErrorChan <- fmt.Errorf("Error in event payload: %s", err)
+			log.Error(fmt.Sprintf("error in event payload: %s", err))
 		}
 		ev.Handle(c, json)
 		c.EventChan <- ev
@@ -67,7 +68,7 @@ func (c *Client) Listen(wg *sync.WaitGroup, address string) *http.Server {
 	go func() {
 		defer wg.Done()
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			c.ErrorChan <- fmt.Errorf("while listening on address %s: %s", address, err)
+			log.Error(fmt.Sprintf("while listening on address %s: %s", address, err))
 		}
 	}()
 	return srv

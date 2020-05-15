@@ -38,6 +38,11 @@ func (p *PushJob) GetRefName() string {
 	return p.event.RefName
 }
 
+// GetRepoName get reference name from event that triggered job
+func (p *PushJob) GetRepoName() string {
+	return p.event.Repo.Name
+}
+
 // Compare implements queue.Item
 func (p *PushJob) Compare(other queue.Item) int {
 	return 0

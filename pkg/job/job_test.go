@@ -231,7 +231,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	api := ghclient.NewAPI()
 	api.Client = client
 
-	gh := ghclient.NewClient(nil, nil)
+	gh := ghclient.NewClient(nil)
 	gh.Api = api
 
 	ref := ghclient.Reference{}

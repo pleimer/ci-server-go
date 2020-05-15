@@ -26,11 +26,13 @@ func (js Status) String() string {
 
 // Job type contains sequence of actions for different scenarios
 type Job interface {
-	GetRefName() string
-	Run(context.Context)
-	Cancel()
-	Compare(queue.Item) int
 	SetLogger(*logging.Logger)
+
+	Run(context.Context)
+	Compare(queue.Item) int
+
+	GetRefName() string
+	GetRepoName() string
 }
 
 // Factory generate jobs based on event type

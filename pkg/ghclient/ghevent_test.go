@@ -38,7 +38,7 @@ func TestHandle(t *testing.T) {
 		webhook := getWebhook()
 		testRepoJSON, err := json.Marshal(webhook)
 		assert.Ok(t, err)
-		gh := NewClient(nil, nil)
+		gh := NewClient(nil)
 
 		pushEvent := &Push{}
 

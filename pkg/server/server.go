@@ -35,9 +35,8 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	evChan := make(chan ghclient.Event)
-	errChan := make(chan error)
 
-	gh := ghclient.NewClient(evChan, errChan)
+	gh := ghclient.NewClient(evChan)
 	err = gh.Api.Authenticate(strings.NewReader(config.Oauth))
 	if err != nil {
 		log.Error(err.Error())
@@ -46,7 +45,7 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	log.Info("successfully authenticated with oauth token")
 
 	wg.Add(1)
-	server := gh.Listen(wg, config.Proxy)
+	server := gh.Listen(wg, config.Proxy, log)
 	log.Info(fmt.Sprintf("listening on %s for webhooks", config.Proxy))
 	if err := server.Shutdown(ctx); err != nil {
 		log.Error(fmt.Sprintf("error shutting down server gracefully: %s", err))
@@ -58,19 +57,18 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go jobManager.Run(ctx, wg, jobChan)
 
-	select {
-	case ev := <-evChan:
-		j, err := job.Factory(ev, &gh, log)
-		if err != nil {
-			log.Error(err.Error())
-			break
+	for {
+		select {
+		case ev := <-evChan:
+			j, err := job.Factory(ev, &gh, log)
+			if err != nil {
+				log.Error(err.Error())
+				break
+			}
+			jobChan <- j
+		case <-ctx.Done():
+			log.Info("server process exited")
+			return
 		}
-		jobChan <- j
-
-	case err := <-errChan:
-		log.Error(fmt.Sprintf("%v", err))
-		cancel()
-	case <-ctx.Done():
-		log.Info("server cleaning up resources")
 	}
 }

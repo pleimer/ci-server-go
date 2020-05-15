@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/infrawatch/ci-server-go/pkg/assert"
+	"github.com/infrawatch/ci-server-go/pkg/logging"
 )
 
 func TestAuthenticate(t *testing.T) {
@@ -104,25 +105,24 @@ func TestUpdateStatus(t *testing.T) {
 
 func TestListen(t *testing.T) {
 	eventChan := make(chan Event, 10)
-	errChan := make(chan error, 10)
-	gh := NewClient(eventChan, errChan)
+	gh := NewClient(eventChan)
+	log, err := logging.NewLogger(logging.NONE, "console")
+	assert.Ok(t, err)
 
-	go gh.Listen(nil, ":8888")
+	go gh.Listen(nil, ":8888", log)
 	req, _ := http.NewRequest("POST", "http://127.0.0.1:8888/webhook", strings.NewReader(`{payload:"payload"}`))
 
 	time.Sleep(time.Second)
 	req.Header.Set("X-Github-Event", "push")
 
 	srv := http.Client{}
-	_, err := srv.Do(req)
+	_, err = srv.Do(req)
 	assert.Ok(t, err)
 
 	select {
-	case err := <-gh.ErrorChan:
-		assert.Ok(t, err)
 	case <-gh.EventChan:
 	default:
-		t.Errorf("Did not receive event or error")
+		t.Errorf("Did not receive event")
 	}
 }
 
