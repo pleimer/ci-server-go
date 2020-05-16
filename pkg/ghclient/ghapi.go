@@ -14,6 +14,8 @@ type API struct {
 	Client  *http.Client
 	BaseURL string
 	oauth   string
+
+	err GithubClientError
 }
 
 // NewAPI creates new api type
@@ -21,6 +23,9 @@ func NewAPI() API {
 	return API{
 		Client:  &http.Client{},
 		BaseURL: "https://api.github.com",
+		err: GithubClientError{
+			module: "API",
+		},
 	}
 }
 
@@ -28,23 +33,35 @@ func NewAPI() API {
 func (a *API) Authenticate(oauth io.Reader) error {
 	obytes, err := ioutil.ReadAll(oauth)
 	if err != nil {
-		return fmt.Errorf("reading oauth token failed: %s", err)
+		return a.err.withMessage(fmt.Sprintf("reading oauth token failed: %s", err))
 	}
 	a.oauth = string(obytes)
 	res, err := a.get(a.BaseURL)
 	if err != nil {
-		return err
+		return a.err.withMessage(err.Error())
 	}
-	return assertCode(res, 200, "failed to authenticate")
+	defer res.Body.Close()
+
+	if res.StatusCode != 200 {
+		a.err.withMessage(fmt.Sprintf("received status %s", res.Status))
+	}
+	return nil
 }
 
 // PostStatus sends post request to status
 func (a *API) PostStatus(owner, repo, commitSha string, body []byte) error {
 	res, err := a.post(a.StatusURL(owner, repo, commitSha), body)
 	if err != nil {
-		return err
+		return a.err.withMessage(err.Error())
 	}
-	return assertCode(res, 201, "failed to update github status")
+	defer res.Body.Close()
+
+	cCode := 201
+	if res.StatusCode != cCode {
+		return a.err.withMessage(fmt.Sprintf("expected status code %d, received %s", cCode, res.Status))
+	}
+
+	return nil
 }
 
 // PostGists sends post request to status
@@ -53,16 +70,17 @@ func (a *API) PostGists(body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
+
 	info, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("while reading response to gist POST: %s", err)
+		return nil, a.err.withMessage(fmt.Sprintf("failed reading server response: %s", err))
 	}
 
-	err = assertCode(res, 201, "failed to post gist to github")
-	if err != nil {
-		return nil, err
+	cCode := 201
+	if res.StatusCode != cCode {
+		return nil, a.err.withMessage(fmt.Sprintf("expected status code %d, received %s", cCode, res.Status))
 	}
-
 	return info, nil
 }
 
@@ -72,12 +90,18 @@ func (a *API) GetTree(owner, repo, sha string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
-	if err := assertCode(res, 200, "failed to retrieve github tree"); err != nil {
-		return nil, err
+	cCode := 200
+	if res.StatusCode != cCode {
+		return nil, a.err.withMessage(fmt.Sprintf("expected status code %d, received %s", cCode, res.Status))
 	}
 
-	return ioutil.ReadAll(res.Body)
+	info, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, a.err.withMessage(fmt.Sprintf("failed reading server response: %s", err))
+	}
+	return info, nil
 }
 
 // GetBlob retrieve github tree
@@ -87,11 +111,16 @@ func (a *API) GetBlob(owner, repo, sha string) ([]byte, error) {
 		return nil, err
 	}
 
-	if err := assertCode(res, 200, "failed to retrieve github blob"); err != nil {
-		return nil, err
+	cCode := 200
+	if res.StatusCode != cCode {
+		return nil, a.err.withMessage(fmt.Sprintf("expected status code %d, received %s", cCode, res.Status))
 	}
 
-	return ioutil.ReadAll(res.Body)
+	info, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, a.err.withMessage(fmt.Sprintf("failed reading server response: %s", err))
+	}
+	return info, nil
 }
 
 func (a *API) get(URL string) (*http.Response, error) {
@@ -147,14 +176,4 @@ func (a *API) makeURL(items []string, params ...string) string {
 		}
 	}
 	return sb.String()
-}
-
-// API object helper functions
-func assertCode(res *http.Response, status int, premsg string) error {
-	defer res.Body.Close()
-
-	if res.StatusCode != status {
-		return fmt.Errorf(premsg+". Received status: %s", res.Status)
-	}
-	return nil
 }

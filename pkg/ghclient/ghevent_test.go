@@ -34,9 +34,10 @@ func getWebhook() map[string]interface{} {
 }
 
 func TestHandle(t *testing.T) {
-	t.Run("push event handle", func(t *testing.T) {
+	t.Run("regular", func(t *testing.T) {
 		webhook := getWebhook()
 		testRepoJSON, err := json.Marshal(webhook)
+
 		assert.Ok(t, err)
 		gh := NewClient(nil)
 
@@ -47,17 +48,58 @@ func TestHandle(t *testing.T) {
 			assert.Ok(t, err)
 		}
 
-		var repoName string
-		switch n := webhook["repository"].(map[string]interface{})["name"].(type) {
-		case string:
-			repoName = n
-		}
+		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
 		refName := webhook["ref"].(string)
 		ref := gh.repositories[repoName].refs[`"`+refName+`"`]
 
 		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
-		return
+	})
+
+	t.Run("new branch", func(t *testing.T) {
+		webhook := getWebhook()
+
+		// in new branch, webhook contains no commits in the "commit" mapslice
+		// but does contain the commit in the "head_commit" key
+		headCommit := webhook["commits"].([]map[string]interface{})[0]
+		webhook["commits"] = make([]map[string]interface{}, 0)
+		webhook["head_commit"] = headCommit
+		testRepoJSON, err := json.Marshal(webhook)
+		assert.Ok(t, err)
+
+		gh := NewClient(nil)
+
+		pushEvent := &Push{}
+
+		err = pushEvent.Handle(&gh, testRepoJSON)
+		if err != nil {
+			assert.Ok(t, err)
+		}
+
+		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
+		refName := webhook["ref"].(string)
+		ref := gh.repositories[repoName].refs[`"`+refName+`"`]
+
+		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (ref != nil), "failed to create reference")
+		assert.Assert(t, (ref.head != nil), "failed to create commit")
+	})
+
+	t.Run("corrupt push", func(t *testing.T) {
+		webhook := getWebhook()
+
+		webhook["commits"] = make([]map[string]interface{}, 0)
+		testRepoJSON, err := json.Marshal(webhook)
+		assert.Ok(t, err)
+
+		gh := NewClient(nil)
+
+		pushEvent := &Push{}
+
+		err = pushEvent.Handle(&gh, testRepoJSON)
+		if err != nil {
+			assert.Assert(t, (err != nil), "should have been an error")
+		}
 	})
 }

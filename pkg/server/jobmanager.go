@@ -81,12 +81,10 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 				jb.log.Debug("job queue disposed")
 				return
 			}
-
 			if runningJob, ok := jb.runningJobs.Get(j.GetRepoName(), j.GetRefName()); ok {
 				runningJob.cancel()
 				jb.log.Info(fmt.Sprintf("conflicting job for repository %s, ref %s - cancelled running job", j.GetRepoName(), j.GetRefName()))
 			}
-
 			jCtx, jCancel := context.WithTimeout(ctx, jb.jobTime)
 			jb.runningJobs.Set(j.GetRepoName(), j.GetRefName(), &jobContext{
 				job:    j,

@@ -16,7 +16,7 @@ import (
 func Run(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	log, err := logging.NewLogger(logging.INFO, "console")
+	log, err := logging.NewLogger(logging.DEBUG, "console")
 	if err != nil {
 		log.Error(err.Error())
 		return
@@ -45,11 +45,8 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	log.Info("successfully authenticated with oauth token")
 
 	wg.Add(1)
-	server := gh.Listen(wg, config.Proxy, log)
-	log.Info(fmt.Sprintf("listening on %s for webhooks", config.Proxy))
-	if err := server.Shutdown(ctx); err != nil {
-		log.Error(fmt.Sprintf("error shutting down server gracefully: %s", err))
-	}
+	server := gh.Listen(wg, config.ListenAddress, log)
+	log.Info(fmt.Sprintf("listening on %s for webhooks", config.ListenAddress))
 
 	jobChan := make(chan job.Job)
 
@@ -67,6 +64,9 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 			}
 			jobChan <- j
 		case <-ctx.Done():
+			if err := server.Shutdown(ctx); err != nil {
+				log.Error(fmt.Sprintf("error shutting down server gracefully: %s", err))
+			}
 			log.Info("server process exited")
 			return
 		}

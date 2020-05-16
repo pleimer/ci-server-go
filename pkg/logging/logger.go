@@ -113,19 +113,20 @@ func (l *Logger) writeRecord(level LogLevel, message string) error {
 		_, err = build.WriteString(time.Now().Format("2006-01-02 15:04:05 "))
 	}
 
-	_, err = build.WriteString(fmt.Sprintf("[%s] ", level))
+	_, err = build.WriteString(fmt.Sprintf("[%s]", level))
 	if err != nil {
 		return nil
+	}
+
+	if len(metadata) > 0 {
+		_, err = build.WriteString(fmt.Sprintf("[%s] ", metadata))
+		if err != nil {
+			return nil
+		}
 	}
 	_, err = build.WriteString(message)
 	if err != nil {
 		return nil
-	}
-	if len(metadata) > 0 {
-		_, err = build.WriteString(fmt.Sprintf(" [%s]", metadata))
-		if err != nil {
-			return nil
-		}
 	}
 	_, err = build.WriteString("\n")
 	if err != nil {

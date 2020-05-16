@@ -149,12 +149,12 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 
 			blobJSON, err := c.Api.GetBlob(repo.Owner.Login, repo.Name, cRef.Sha)
 			if err != nil {
-				return err
+				return c.err.withMessage(fmt.Sprintf("failed to get blob: %s", err))
 			}
 
 			child, err = NewBlobFromJSON(blobJSON)
 			if err != nil {
-				return err
+				return c.err.withMessage(fmt.Sprintf("failed to create blob object from JSON: %s", err))
 			}
 
 			child.Path = cRef.Path
@@ -171,12 +171,12 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 
 			treeJSON, err := c.Api.GetTree(repo.Owner.Login, repo.Name, cRef.Sha)
 			if err != nil {
-				return err
+				return c.err.withMessage(fmt.Sprintf("failed to get tree: %s", err))
 			}
 
 			child, err = NewTreeFromJSON(treeJSON)
 			if err != nil {
-				return err
+				return c.err.withMessage(fmt.Sprintf("failed to create tree object from JSON: %s", err))
 			}
 
 			child.Path = cRef.Path
@@ -186,12 +186,12 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 
 			err = json.Unmarshal(treeJSON, &treeMarsh)
 			if err != nil {
-				return fmt.Errorf("error while parsing tree json: %s", err)
+				return c.err.withMessage(fmt.Sprintf("failed to parse tree JSON: %s", err))
 			}
 
 			err = c.buildTree(child, treeMarsh, repo)
 			if err != nil {
-				return err
+				return c.err.withMessage(fmt.Sprintf("failed to build tree: %s", err))
 			}
 		}
 	}

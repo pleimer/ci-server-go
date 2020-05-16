@@ -55,11 +55,20 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 		return fmt.Errorf("failed parsing list of commits: %s", err)
 	}
 
+	// build up commit slive to create list from
 	var cSlice []Commit
+	if len(cSliceJSON) == 0 {
+		headCommit := eventMap["head_commit"]
+		if headCommit == nil {
+			return fmt.Errorf("no commits arrived with event")
+		}
+		cSliceJSON = append(cSliceJSON, headCommit)
+	}
+
 	for _, cJSON := range cSliceJSON {
 		c, err := NewCommitFromJSON(cJSON)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed creating commit object from JSON: %s", err)
 		}
 		cSlice = append(cSlice, *c)
 	}
@@ -70,6 +79,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 			c.setParent(&cSlice[i+1])
 		}
 	}
+
 	head := &cSlice[0]
 	cSlice = nil
 

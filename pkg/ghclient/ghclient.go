@@ -13,11 +13,12 @@ import (
 // Client github client object
 type Client struct {
 	EventChan chan Event
-	ErrorChan chan error
 
 	Api          API
 	Cache        Cache
 	repositories map[string]*Repository
+
+	err GithubClientError
 }
 
 // NewClient create a new github Client
@@ -27,6 +28,9 @@ func NewClient(eventChan chan Event) Client {
 		repositories: make(map[string]*Repository),
 		Cache:        NewCache(),
 		EventChan:    eventChan,
+		err: GithubClientError{
+			module: "ghclient",
+		},
 	}
 }
 
@@ -35,7 +39,7 @@ func (c *Client) UpdateCommitStatus(repo Repository, commit Commit) error {
 	// update internally
 	cIn := c.Cache.GetCommit(commit.Sha)
 	if cIn == nil {
-		return fmt.Errorf("ghclient - commit has not been indexed or previously initialized")
+		return c.err.withMessage("commit has not been indexed or previously initialized")
 	}
 
 	cIn.Status = commit.Status
@@ -43,7 +47,7 @@ func (c *Client) UpdateCommitStatus(repo Repository, commit Commit) error {
 	// update remote
 	body, err := json.Marshal(cIn.Status)
 	if err != nil {
-		return err
+		return c.err.withMessage(fmt.Sprintf("failed to commit json: %s", err))
 	}
 	return c.Api.PostStatus(repo.Owner.Login, repo.Name, cIn.Sha, body)
 }
@@ -51,25 +55,37 @@ func (c *Client) UpdateCommitStatus(repo Repository, commit Commit) error {
 // Listen listen on address for webhooks
 func (c *Client) Listen(wg *sync.WaitGroup, address string, log *logging.Logger) *http.Server {
 	srv := &http.Server{Addr: address}
+
+	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		w.Write([]byte("Hello!"))
+	})
 	http.HandleFunc("/webhook", func(w http.ResponseWriter, req *http.Request) {
 		ev, err := EventFactory(req.Header.Get("X-Github-Event"))
 		if err != nil {
-			c.ErrorChan <- err
+			log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook", "error": err})
+			log.Error("failed parsing incoming event")
 			return
 		}
 		json, err := ioutil.ReadAll(req.Body)
 		if err != nil {
+			log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook"})
 			log.Error(fmt.Sprintf("error in event payload: %s", err))
 		}
+		log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook"})
+		log.Debug(fmt.Sprintf("received payload: %s", json))
 		ev.Handle(c, json)
 		c.EventChan <- ev
 	})
 
 	go func() {
 		defer wg.Done()
-		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Error(fmt.Sprintf("while listening on address %s: %s", address, err))
+		err := srv.ListenAndServe()
+		if err != http.ErrServerClosed {
+			log.Metadata(map[string]interface{}{"module": "ghclient", "address": address, "error": err})
+			log.Error("webhook server failed")
 		}
+		log.Metadata(map[string]interface{}{"module": "ghclient", "info": err})
+		log.Info("closed webhook server")
 	}()
 	return srv
 }

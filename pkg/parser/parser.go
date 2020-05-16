@@ -24,6 +24,7 @@ type Spec struct {
 }
 
 func (s *Spec) ScriptCmd(ctx context.Context, basePath string) *exec.Cmd {
+	fmt.Println(*s)
 	cmd := s.genEnv(ctx, s.Script)
 	cmd.Dir = basePath
 	return cmd

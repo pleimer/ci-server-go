@@ -42,17 +42,17 @@ func newCoreJob(client *ghclient.Client, repo ghclient.Repository, commit ghclie
 // gather resources needed to run any of the core functions
 // specifically, download the tree and gather the spec from
 // the yaml file
-func (cj *coreJob) getResources() {
+func (cj *coreJob) getResources() error {
 	tree, err := cj.client.GetTree(cj.commit.Sha, cj.repo)
 	if err != nil {
 		cj.Log.Info(err.Error())
-		return
+		return err
 	}
 
 	err = ghclient.WriteTreeToDirectory(tree, cj.BasePath)
 	if err != nil {
 		cj.Log.Info(err.Error())
-		return
+		return err
 	}
 	cj.BasePath = cj.BasePath + tree.Path
 
@@ -61,13 +61,14 @@ func (cj *coreJob) getResources() {
 	defer f.Close()
 	if err != nil {
 		cj.Log.Info(err.Error())
-		return
+		return err
 	}
 	cj.spec, err = parser.NewSpecFromYAML(f)
 	if err != nil {
 		cj.Log.Info(err.Error())
-		return
+		return err
 	}
+	return nil
 }
 
 // runs spec.Script
