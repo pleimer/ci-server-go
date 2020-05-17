@@ -14,5 +14,5 @@ func (e *GithubClientError) withMessage(message string) *GithubClientError {
 }
 
 func (e *GithubClientError) Error() string {
-	return fmt.Sprintf("module: %s, error: %s ", e.module, e.err)
+	return fmt.Sprintf("ghclient.%s: %s ", e.module, e.err)
 }

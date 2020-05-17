@@ -102,4 +102,27 @@ func TestHandle(t *testing.T) {
 			assert.Assert(t, (err != nil), "should have been an error")
 		}
 	})
+
+	t.Run("branch merge", func(t *testing.T) {
+		webhook := getWebhook()
+		testRepoJSON, err := json.Marshal(webhook)
+
+		assert.Ok(t, err)
+		gh := NewClient(nil)
+
+		pushEvent := &Push{}
+
+		err = pushEvent.Handle(&gh, testRepoJSON)
+		if err != nil {
+			assert.Ok(t, err)
+		}
+
+		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
+		refName := webhook["ref"].(string)
+		ref := gh.repositories[repoName].refs[`"`+refName+`"`]
+
+		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (ref != nil), "failed to create reference")
+		assert.Assert(t, (ref.head != nil), "failed to create commit")
+	})
 }

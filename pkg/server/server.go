@@ -59,15 +59,16 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 		case ev := <-evChan:
 			j, err := job.Factory(ev, &gh, log)
 			if err != nil {
-				log.Error(err.Error())
+				log.Metadata(map[string]interface{}{"process": "server", "error": err})
+				log.Error("failed creating job from event")
 				break
 			}
 			jobChan <- j
 		case <-ctx.Done():
 			if err := server.Shutdown(ctx); err != nil {
-				log.Error(fmt.Sprintf("error shutting down server gracefully: %s", err))
+				log.Metadata(map[string]interface{}{"process": "server", "error": err})
+				log.Error("failed shutting down server gracefully")
 			}
-			log.Info("server process exited")
 			return
 		}
 	}

@@ -72,7 +72,7 @@ func (c *Client) Listen(wg *sync.WaitGroup, address string, log *logging.Logger)
 			log.Error(fmt.Sprintf("error in event payload: %s", err))
 		}
 		log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook"})
-		log.Debug(fmt.Sprintf("received payload: %s", json))
+		log.Debug("received payload")
 		ev.Handle(c, json)
 		c.EventChan <- ev
 	})

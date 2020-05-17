@@ -75,9 +75,9 @@ func TestPushJob(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	spec, github, repo, _, commit, log, _ := genTestEnvironment([]string{"sleep 10"}, []string{"sleep 10"})
+	spec, github, repo, _, commit, _, _ := genTestEnvironment([]string{"sleep 10"}, []string{"sleep 10"})
 
-	cjUT := newCoreJob(github, *repo, commit, log)
+	cjUT := newCoreJob(github, *repo, commit)
 	cjUT.spec = spec
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)

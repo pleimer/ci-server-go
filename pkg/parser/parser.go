@@ -13,6 +13,15 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type ParserError struct {
+	msg string
+	err error
+}
+
+func (pe *ParserError) Error() string {
+	return fmt.Sprintf("parser: %s: %s", pe.msg, pe.err)
+}
+
 type Global struct {
 	Timeout int                    `yaml:"timeout"`
 	Env     map[string]interface{} `yaml:"env"`
@@ -24,7 +33,6 @@ type Spec struct {
 }
 
 func (s *Spec) ScriptCmd(ctx context.Context, basePath string) *exec.Cmd {
-	fmt.Println(*s)
 	cmd := s.genEnv(ctx, s.Script)
 	cmd.Dir = basePath
 	return cmd
@@ -57,11 +65,11 @@ func NewSpecFromYAML(yamlSpec io.Reader) (*Spec, error) {
 	var spec Spec
 	res, err := ioutil.ReadAll(yamlSpec)
 	if err != nil {
-		return nil, fmt.Errorf("when unmarshalling yaml spec: %s", err)
+		return nil, &ParserError{msg: "failed unmarshalling yaml spec", err: err}
 	}
 	err = yaml.Unmarshal(res, &spec)
 	if err != nil {
-		return nil, fmt.Errorf("when unmarshalling yaml spec: %s", err)
+		return nil, &ParserError{msg: "failed unmarshalling yaml spec", err: err}
 	}
 	return &spec, nil
 }

@@ -2,7 +2,7 @@ package job
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang-collections/go-datastructures/queue"
@@ -46,18 +46,29 @@ func (p *PushJob) Compare(other queue.Item) int {
 func (p *PushJob) Run(ctx context.Context) {
 	p.Status = RUNNING
 	commit := p.event.Ref.GetHead()
-	cj := newCoreJob(p.client, p.event.Repo, *commit, p.Log)
+	cj := newCoreJob(p.client, p.event.Repo, *commit)
 	cj.BasePath = "/tmp/"
 
-	p.Log.Debug("job retrieving resources")
 	err := cj.getResources()
 	if err != nil {
-		p.Log.Error(fmt.Sprintf("failed to get resources: %s", err))
-		cj.postResults()
-		return
+		switch err.(type) {
+		case *os.PathError:
+			p.Log.Metadata(map[string]interface{}{"process": "PushJob", "info": err})
+			p.Log.Debug("tree already exists, skipping download")
+		default:
+			p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+			p.Log.Error("failed to get resources")
+			cj.postResults()
+			return
+		}
 	}
 
-	p.handleContextError(cj.runScript(ctx))
+	err = cj.runScript(ctx)
+	if err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		p.Log.Info("script failed")
+	}
+	p.handleContextError(err)
 
 	// It is highly NOT recommended to create top level contexts in lower functions
 	// 'After script' is responsible for cleaning up resources, so it must run even when a cancel signal
@@ -65,8 +76,18 @@ func (p *PushJob) Run(ctx context.Context) {
 	// so it isn't too terrible
 	ctxTimeoutAfterScrip, cancelAfterScript := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancelAfterScript()
-	p.handleContextError(cj.runAfterScript(ctxTimeoutAfterScrip))
-	cj.postResults()
+	err = cj.runAfterScript(ctxTimeoutAfterScrip)
+	if err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		p.Log.Info("after_script failed")
+	}
+	p.handleContextError(err)
+
+	err = cj.postResults()
+	if err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		p.Log.Info("failed to post results")
+	}
 	p.Status = COMPLETE
 }
 

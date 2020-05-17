@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
-	"github.com/infrawatch/ci-server-go/pkg/logging"
 	"github.com/infrawatch/ci-server-go/pkg/parser"
 )
 
@@ -23,17 +22,14 @@ type coreJob struct {
 	scriptOutput      []byte
 	afterScriptOutput []byte
 
-	Log *logging.Logger
-
 	BasePath string
 }
 
-func newCoreJob(client *ghclient.Client, repo ghclient.Repository, commit ghclient.Commit, logger *logging.Logger) *coreJob {
+func newCoreJob(client *ghclient.Client, repo ghclient.Repository, commit ghclient.Commit) *coreJob {
 	cj := coreJob{
 		client: client,
 		repo:   repo,
 		commit: commit,
-		Log:    logger,
 	}
 	cj.commit.SetContext("ci-server-go")
 	return &cj
@@ -45,13 +41,11 @@ func newCoreJob(client *ghclient.Client, repo ghclient.Repository, commit ghclie
 func (cj *coreJob) getResources() error {
 	tree, err := cj.client.GetTree(cj.commit.Sha, cj.repo)
 	if err != nil {
-		cj.Log.Info(err.Error())
 		return err
 	}
 
 	err = ghclient.WriteTreeToDirectory(tree, cj.BasePath)
 	if err != nil {
-		cj.Log.Info(err.Error())
 		return err
 	}
 	cj.BasePath = cj.BasePath + tree.Path
@@ -60,12 +54,10 @@ func (cj *coreJob) getResources() error {
 	f, err := os.Open(cj.yamlPath(tree))
 	defer f.Close()
 	if err != nil {
-		cj.Log.Info(err.Error())
 		return err
 	}
 	cj.spec, err = parser.NewSpecFromYAML(f)
 	if err != nil {
-		cj.Log.Info(err.Error())
 		return err
 	}
 	return nil
@@ -81,14 +73,12 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 	// run script with timeout
 	cj.scriptOutput, err = cj.spec.ScriptCmd(ctx, cj.BasePath).Output()
 	if ctx.Err() != nil {
-		cj.Log.Info(ctx.Err().Error())
 		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("main script failed: %s", ctx.Err().Error()), "")
 		return ctx.Err()
 	}
 
 	if err != nil {
 		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("job failed with: %s", err), "")
-		cj.Log.Info(err.Error())
 		return err
 	}
 	cj.commit.SetStatus(ghclient.SUCCESS, "all tests passed", "")
@@ -101,13 +91,11 @@ func (cj *coreJob) runAfterScript(ctx context.Context) error {
 	cj.afterScriptOutput, err = cj.spec.AfterScriptCmd(ctx, cj.BasePath).Output()
 
 	if ctx.Err() != nil {
-		cj.Log.Info(ctx.Err().Error())
 		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("after_script failed: %s", ctx.Err().Error()), "")
 		return ctx.Err()
 	}
 
 	if err != nil {
-		cj.Log.Info(err.Error())
 		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("job failed with: %s", err), "")
 		return err
 	}
@@ -115,7 +103,7 @@ func (cj *coreJob) runAfterScript(ctx context.Context) error {
 }
 
 // post commit status and gist report to github client
-func (cj *coreJob) postResults() {
+func (cj *coreJob) postResults() error {
 	//post gist
 	report := string(cj.buildReport())
 	gist := ghclient.NewGist()
@@ -123,24 +111,28 @@ func (cj *coreJob) postResults() {
 	gist.AddFile(fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha), report)
 	gJSON, err := json.Marshal(gist)
 	if err != nil {
-		cj.Log.Info(err.Error())
+		return err
 	}
 
 	res, err := cj.client.Api.PostGists(gJSON)
 	if err != nil {
-		cj.Log.Info(err.Error())
+		return err
 	}
 
 	// get gist target url
 	resMap := make(map[string]interface{})
 	err = json.Unmarshal(res, &resMap)
 	if err != nil {
-		cj.Log.Info(fmt.Sprintf("while unmarshalling gist response: %s", err))
+		return err
 	}
 
 	targetURL := resMap["url"].(string)
 	cj.commit.Status.TargetURL = targetURL
-	cj.postCommitStatus()
+	err = cj.postCommitStatus()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // ----------- helper functions ---------------
@@ -169,7 +161,6 @@ func (cj *coreJob) buildReport() []byte {
 func (cj *coreJob) postCommitStatus() error {
 	err := cj.client.UpdateCommitStatus(cj.repo, cj.commit)
 	if err != nil {
-		cj.Log.Info(err.Error())
 		return err
 	}
 	return nil
