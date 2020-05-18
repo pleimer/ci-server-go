@@ -54,7 +54,7 @@ func (cj *coreJob) loadSpec() error {
 	if err != nil {
 		return err
 	}
-	cj.BasePath = cj.BasePath + tree.Path
+	cj.BasePath = strings.Join([]string{cj.BasePath, tree.Path}, "/")
 
 	f, err := os.Open(cj.yamlPath(tree))
 	defer f.Close()

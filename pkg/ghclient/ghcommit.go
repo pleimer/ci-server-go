@@ -83,7 +83,7 @@ func (c *Commit) String() string {
 // NewCommitFromJSON build commit from json byte slice
 func NewCommitFromJSON(commitJSON []byte) (*Commit, error) {
 	commit := &Commit{}
-	err := json.Unmarshal(commitJSON, &commit)
+	err := json.Unmarshal(commitJSON, commit)
 	if err != nil {
 		return nil, err
 	}

@@ -47,8 +47,10 @@ func (p *PushJob) Run(ctx context.Context) {
 	p.Status = RUNNING
 	commit := p.event.Ref.GetHead()
 	cj := newCoreJob(p.client, p.event.Repo, *commit)
-	cj.BasePath = "/tmp/"
+	cj.BasePath = "/tmp"
 
+	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	p.Log.Info("downloading git tree")
 	err := cj.getTree()
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
@@ -61,6 +63,8 @@ func (p *PushJob) Run(ctx context.Context) {
 		return
 	}
 
+	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	p.Log.Info("loading test specifications")
 	err = cj.loadSpec()
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})

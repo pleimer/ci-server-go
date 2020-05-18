@@ -24,6 +24,7 @@ type TreeMarshal struct {
 type Node interface {
 	GetParent() Node
 	GetChildren() []Node
+	GetPath() string
 	SetChild(Node)
 
 	setParent(Node)
@@ -53,6 +54,10 @@ func (t *Tree) GetParent() Node {
 	return t.parent
 }
 
+func (t *Tree) GetPath() string {
+	return t.Path
+}
+
 func (t *Tree) GetChildren() []Node {
 	return t.children
 }
@@ -69,19 +74,20 @@ func (t *Tree) SetChild(child Node) {
 // RecursivePrint helper function for printing out nodes in tree order
 func RecursivePrint(t Node) (string, error) {
 	var sb strings.Builder
-	sb.WriteString("\n")
-	tJ, err := json.Marshal(t)
-	if err != nil {
-		return "", err
-	}
-	sb.Write(tJ)
+	// sb.WriteString("\n")
+	// tJ, err := json.Marshal(t)
+	// if err != nil {
+	// 	return "", err
+	// }
+	//sb.Write(tJ)
+	sb.WriteString(t.GetPath())
 
 	for _, child := range t.GetChildren() {
 		res, err := RecursivePrint(child)
 		if err != nil {
 			return "", err
 		}
-		sb.WriteString(" ")
+		sb.WriteString("\n")
 		sb.WriteString(res)
 	}
 
@@ -124,6 +130,10 @@ func (b *Blob) SetChild(child Node) {
 	return
 }
 
+func (b *Blob) GetPath() string {
+	return b.Path
+}
+
 func (b *Blob) Write(w io.Writer) error {
 	decoded, err := base64.StdEncoding.DecodeString(b.Content)
 	if err != nil {
@@ -134,10 +144,6 @@ func (b *Blob) Write(w io.Writer) error {
 }
 
 func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) error {
-	if parent == nil {
-		return nil
-	}
-
 	for _, cRef := range treeMarsh.Tree {
 		switch cRef.Type {
 		case "blob":
@@ -163,6 +169,7 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 			parent.SetChild(child)
 
 		case "tree":
+
 			child := c.Cache.GetTree(cRef.Sha)
 			if child != nil {
 				parent.SetChild(child)
@@ -184,12 +191,13 @@ func (c *Client) buildTree(parent Node, treeMarsh TreeMarshal, repo Repository) 
 			c.Cache.WriteTree(child)
 			parent.SetChild(child)
 
-			err = json.Unmarshal(treeJSON, &treeMarsh)
+			var newTreeMarsh TreeMarshal
+			err = json.Unmarshal(treeJSON, &newTreeMarsh)
 			if err != nil {
 				return c.err.withMessage(fmt.Sprintf("failed to parse tree JSON: %s", err))
 			}
 
-			err = c.buildTree(child, treeMarsh, repo)
+			err = c.buildTree(child, newTreeMarsh, repo)
 			if err != nil {
 				return c.err.withMessage(fmt.Sprintf("failed to build tree: %s", err))
 			}
