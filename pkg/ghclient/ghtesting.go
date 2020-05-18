@@ -31,7 +31,8 @@ func TreeServer(tree *Tree, repo *Repository) (map[string]func(*http.Request) (*
 	api := NewAPI()
 
 	err := recurseTreeAction(tree,
-		func(t *Tree) error {
+		nil,
+		func(t *Tree, meta []string) ([]string, error) {
 			serverQuerries[api.TreeURL(repo.Owner.Login, repo.Name, t.Sha)] = func(req *http.Request) (*http.Response, error) {
 				tm := treeMarshalFromTree(t)
 				respBody, err := json.Marshal(tm)
@@ -45,9 +46,9 @@ func TreeServer(tree *Tree, repo *Repository) (map[string]func(*http.Request) (*
 					Header:     make(http.Header),
 				}, nil
 			}
-			return nil
+			return nil, nil
 		},
-		func(b *Blob) error {
+		func(b *Blob, meta []string) ([]string, error) {
 			serverQuerries[api.BlobURL(repo.Owner.Login, repo.Name, b.Sha)] = func(req *http.Request) (*http.Response, error) {
 				respBody, err := json.Marshal(b)
 				if err != nil {
@@ -60,7 +61,7 @@ func TreeServer(tree *Tree, repo *Repository) (map[string]func(*http.Request) (*
 					Header:     make(http.Header),
 				}, nil
 			}
-			return nil
+			return nil, nil
 		},
 	)
 	return serverQuerries, err

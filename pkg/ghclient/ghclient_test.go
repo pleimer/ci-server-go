@@ -49,6 +49,7 @@ func TestAuthenticate(t *testing.T) {
 		api.Client = client
 
 		err := api.Authenticate(oauth)
+		t.Log(err)
 		assert.Assert(t, (err != nil), "Should have been an error")
 	})
 }
@@ -136,12 +137,12 @@ func TestGetTree(t *testing.T) {
 				{
 					Sha:  "b1",
 					Type: "blob",
-					Path: "t0/b1",
+					Path: "b1",
 				},
 				{
 					Sha:  "t1",
 					Type: "tree",
-					Path: "t0/t1",
+					Path: "t1",
 				},
 			},
 		}
@@ -152,17 +153,16 @@ func TestGetTree(t *testing.T) {
 				{
 					Sha:  "b2",
 					Type: "blob",
-					Path: "t0/t1/b2",
+					Path: "b2",
 				},
 				{
 					Sha:  "b22",
 					Type: "blob",
-					Path: "t0/t1/b22",
+					Path: "b22",
 				},
 			},
 		}
 
-		// Tree to compare to
 		t0 := &Tree{
 			Sha:  "t0",
 			Path: "t0",
@@ -171,27 +171,28 @@ func TestGetTree(t *testing.T) {
 		b1 := &Blob{
 			Sha:     "b1",
 			Content: "dGhpcyBpcyBteSBsaWZl",
-			Path:    "t0/b1",
+			Path:    "b1",
 		}
-		t0.SetChild(b1)
 
 		t1 := &Tree{
 			Sha:  "t1",
-			Path: "t0/t1",
+			Path: "t1",
 		}
 
 		b2 := &Blob{
 			Sha:     "b2",
 			Content: "dGhpcyBpcyBteSBsaWZl",
-			Path:    "t0/t1/b2",
+			Path:    "b2",
 		}
-		t1.SetChild(b2)
 
 		b22 := &Blob{
 			Sha:     "b22",
 			Content: "dGhpcyBpcyBteSBsaWZl",
-			Path:    "t0/t1/b22",
+			Path:    "b22",
 		}
+
+		t0.SetChild(b1)
+		t1.SetChild(b2)
 		t1.SetChild(b22)
 		t0.SetChild(t1)
 
@@ -253,7 +254,7 @@ func TestGetTree(t *testing.T) {
 		assert.Ok(t, err)
 		assert.Equals(t, t0, tree)
 
-		err = WriteTreeToDirectory(tree, "")
+		err = WriteTreeToDirectory(tree, "/tmp")
 		assert.Ok(t, err)
 	})
 

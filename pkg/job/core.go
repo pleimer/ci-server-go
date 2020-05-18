@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/infrawatch/ci-server-go/pkg/ghclient"
@@ -73,19 +74,27 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 
 	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
 	cj.postCommitStatus()
+	cj.commit.SetStatus(ghclient.SUCCESS, "all tests passed", "")
 
 	// run script with timeout
 	cj.scriptOutput, err = cj.spec.ScriptCmd(ctx, cj.BasePath).Output()
 	if ctx.Err() != nil {
-		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("main script failed: %s", ctx.Err().Error()), "")
+		if ctx.Err() == context.Canceled {
+			cj.commit.SetStatus(ghclient.ERROR, "script canceled", "")
+		}
+		if ctx.Err() == context.DeadlineExceeded {
+			cj.commit.SetStatus(ghclient.FAILURE, "main script timed out", "")
+		}
+		cj.scriptOutput = []byte(fmt.Sprintf("%serror: %s\n", cj.scriptOutput, err))
 		return ctx.Err()
 	}
 
+	fmt.Println(cj.scriptOutput)
 	if err != nil {
-		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("job failed with: %s", err), "")
+		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("job failed with: %s", err), "")
+		cj.scriptOutput = []byte(fmt.Sprintf("%s\nerror(%s) %s\n", cj.scriptOutput, err, err.(*exec.ExitError).Stderr))
 		return err
 	}
-	cj.commit.SetStatus(ghclient.SUCCESS, "all tests passed", "")
 	return nil
 }
 
@@ -95,12 +104,19 @@ func (cj *coreJob) runAfterScript(ctx context.Context) error {
 	cj.afterScriptOutput, err = cj.spec.AfterScriptCmd(ctx, cj.BasePath).Output()
 
 	if ctx.Err() != nil {
-		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("after_script failed: %s", ctx.Err().Error()), "")
+		if ctx.Err() == context.Canceled {
+			cj.commit.SetStatus(ghclient.ERROR, "after_script canceled", "")
+		}
+		if ctx.Err() == context.DeadlineExceeded {
+			cj.commit.SetStatus(ghclient.FAILURE, "after_script timed out", "")
+		}
+		cj.afterScriptOutput = []byte(fmt.Sprintf("%s\nerror: %s\n", cj.afterScriptOutput, err))
 		return ctx.Err()
 	}
 
 	if err != nil {
-		cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("job failed with: %s", err), "")
+		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("after_script failed with: %s", err), "")
+		cj.afterScriptOutput = []byte(fmt.Sprintf("%s\nerror(%s) %s\n", cj.afterScriptOutput, err, err.(*exec.ExitError).Stderr))
 		return err
 	}
 	return nil
@@ -130,7 +146,11 @@ func (cj *coreJob) postResults() error {
 		return err
 	}
 
-	targetURL := resMap["url"].(string)
+	if _, ok := resMap["id"]; !ok {
+		return fmt.Errorf("failed to retrieve gist ID from github api response")
+	}
+
+	targetURL := cj.getGistPublishedURL(resMap["id"].(string))
 	cj.commit.Status.TargetURL = targetURL
 	err = cj.postCommitStatus()
 	if err != nil {
@@ -147,7 +167,7 @@ func (cj *coreJob) yamlPath(tree *ghclient.Tree) string {
 // build report in markdown format
 func (cj *coreJob) buildReport() []byte {
 	var sb strings.Builder
-	sb.WriteString("## Script Results\n```")
+	sb.WriteString("## Script Results\n```\n")
 	sb.Write(cj.scriptOutput)
 	if len(cj.scriptOutput) == 0 {
 		sb.WriteString("\n")
@@ -162,6 +182,10 @@ func (cj *coreJob) buildReport() []byte {
 }
 
 // helper function post commit status to gh client
+func (cj *coreJob) getGistPublishedURL(id string) string {
+	return fmt.Sprintf("https://gist.github.com/%s/%s", cj.repo.Owner.Login, id)
+}
+
 func (cj *coreJob) postCommitStatus() error {
 	err := cj.client.UpdateCommitStatus(cj.repo, cj.commit)
 	if err != nil {

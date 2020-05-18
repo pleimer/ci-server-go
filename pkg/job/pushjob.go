@@ -2,7 +2,7 @@ package job
 
 import (
 	"context"
-	"os"
+	"fmt"
 	"time"
 
 	"github.com/golang-collections/go-datastructures/queue"
@@ -51,16 +51,14 @@ func (p *PushJob) Run(ctx context.Context) {
 
 	err := cj.getTree()
 	if err != nil {
-		switch err.(type) {
-		case *os.PathError:
-			p.Log.Metadata(map[string]interface{}{"process": "PushJob", "info": err})
-			p.Log.Debug("tree already exists, skipping download")
-		default:
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		p.Log.Error("failed to get resources")
+		err = cj.postResults()
+		if err != nil {
 			p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
-			p.Log.Error("failed to get resources")
-			cj.postResults()
-			return
+			p.Log.Error("failed to post results")
 		}
+		return
 	}
 
 	err = cj.loadSpec()
@@ -74,6 +72,9 @@ func (p *PushJob) Run(ctx context.Context) {
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("script failed")
+	} else {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+		p.Log.Info("main script completed successfully")
 	}
 	p.handleContextError(err)
 
@@ -87,6 +88,9 @@ func (p *PushJob) Run(ctx context.Context) {
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("after_script failed")
+	} else {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+		p.Log.Info("after_script completed successfully")
 	}
 	p.handleContextError(err)
 
@@ -94,6 +98,10 @@ func (p *PushJob) Run(ctx context.Context) {
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("failed to post results")
+	} else {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+		repoName := cj.repo.Name
+		p.Log.Info(fmt.Sprintf("posted '%s' status to '%s|%s|%s'", cj.commit.Status.State, repoName, p.event.RefName, commit.Sha))
 	}
 	p.Status = COMPLETE
 }

@@ -71,5 +71,9 @@ func NewSpecFromYAML(yamlSpec io.Reader) (*Spec, error) {
 	if err != nil {
 		return nil, &ParserError{msg: "failed unmarshalling yaml spec", err: err}
 	}
+
+	if spec.Global == nil {
+		spec.Global = &Global{}
+	}
 	return &spec, nil
 }

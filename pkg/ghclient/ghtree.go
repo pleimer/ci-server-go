@@ -66,8 +66,8 @@ func (t *Tree) SetChild(child Node) {
 	t.children = append(t.children, child)
 }
 
-// helper function for printing out nodes in tree order
-func recursivePrint(t Node) (string, error) {
+// RecursivePrint helper function for printing out nodes in tree order
+func RecursivePrint(t Node) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("\n")
 	tJ, err := json.Marshal(t)
@@ -77,7 +77,7 @@ func recursivePrint(t Node) (string, error) {
 	sb.Write(tJ)
 
 	for _, child := range t.GetChildren() {
-		res, err := recursivePrint(child)
+		res, err := RecursivePrint(child)
 		if err != nil {
 			return "", err
 		}
@@ -233,41 +233,53 @@ func (c *Client) GetTree(sha string, repo Repository) (*Tree, error) {
 }
 
 // WriteTreeToDirectory write tree to specified directory path
-func WriteTreeToDirectory(top Node, path string) error {
+func WriteTreeToDirectory(top Node, basePath string) error {
 	return recurseTreeAction(top,
-		func(t *Tree) error {
-			err := os.Mkdir(path+t.Path, 0777)
+		[]string{basePath},
+		func(t *Tree, path []string) ([]string, error) {
+			path = append(path, t.Path)
+			pathStr := strings.Join(path, "/")
+			err := os.MkdirAll(pathStr, 0777)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			return nil
+			return path, nil
 		},
-		func(b *Blob) error {
-			f, err := os.Create(path + b.Path)
+		func(b *Blob, path []string) ([]string, error) {
+			path = append(path, b.Path)
+			pathStr := strings.Join(path, "/")
+			f, err := os.Create(pathStr)
 			if err != nil {
-				return err
+				return nil, err
+			}
+
+			ft := strings.Split(b.Path, ".")
+			if ft[len(ft)-1] == "sh" {
+				f.Chmod(0777)
 			}
 			defer f.Close()
 			b.Write(f)
-			return nil
+			return path, nil
 		})
 }
 
-func recurseTreeAction(top Node, treeAction func(*Tree) error, blobAction func(*Blob) error) error {
+func recurseTreeAction(top Node, metadata []string, treeAction func(*Tree, []string) ([]string, error), blobAction func(*Blob, []string) ([]string, error)) error {
+	var newMetaData []string
+	var err error
 	switch v := top.(type) {
 	case *Tree:
-		err := treeAction(v)
+		newMetaData, err = treeAction(v, metadata)
 		if err != nil {
 			return err
 		}
 	case *Blob:
-		err := blobAction(v)
+		newMetaData, err = blobAction(v, metadata)
 		if err != nil {
 			return err
 		}
 	}
 	for _, child := range top.GetChildren() {
-		err := recurseTreeAction(child, treeAction, blobAction)
+		err := recurseTreeAction(child, newMetaData, treeAction, blobAction)
 		if err != nil {
 			return err
 		}

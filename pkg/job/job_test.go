@@ -29,12 +29,13 @@ var (
 func TestPushJob(t *testing.T) {
 	t.Run("regular run", func(t *testing.T) {
 		_, github, repo, ref, commit, log, _ := genTestEnvironment([]string{"echo $OCP_PROJECT"}, []string{"echo Done"})
-		path := "/tmp/"
+		path := "/tmp"
 		deleteFiles(path)
 
 		ev := ghclient.Push{
-			Repo: *repo,
-			Ref:  *ref,
+			Repo:    *repo,
+			RefName: "refs/head/master",
+			Ref:     *ref,
 		}
 
 		pj := PushJob{
@@ -49,15 +50,39 @@ func TestPushJob(t *testing.T) {
 		assert.Equals(t, expGistStr, gistString)
 	})
 
+	t.Run("script fail", func(t *testing.T) {
+		_, github, repo, ref, commit, log, _ := genTestEnvironment([]string{"exit 1"}, []string{"echo Done"})
+		path := "/tmp"
+		deleteFiles(path)
+
+		ev := ghclient.Push{
+			Repo:    *repo,
+			RefName: "refs/head/master",
+			Ref:     *ref,
+		}
+
+		pj := PushJob{
+			event:    &ev,
+			client:   github,
+			BasePath: path,
+			Log:      log,
+		}
+
+		pj.Run(context.Background())
+		expGistStr := formatGistOutput(repo.Name, commit.Sha, "\nerror(exit status 1) ", "Done")
+		assert.Equals(t, expGistStr, gistString)
+	})
+
 	t.Run("send cancel signal", func(t *testing.T) {
 		// in this case, the after script should still run to cleanup resources
-		path := "/tmp/"
+		path := "/tmp"
 		deleteFiles(path)
 
 		_, client, repo, ref, commit, log, _ := genTestEnvironment([]string{"sleep 2", "echo Script Done"}, []string{"echo Done"})
 		ev := ghclient.Push{
-			Repo: *repo,
-			Ref:  *ref,
+			Repo:    *repo,
+			RefName: "refs/head/master",
+			Ref:     *ref,
 		}
 		pj := PushJob{
 			event:    &ev,
@@ -69,7 +94,7 @@ func TestPushJob(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		pj.Run(ctx)
-		expGistStr := formatGistOutput(repo.Name, commit.Sha, "", "Done")
+		expGistStr := formatGistOutput(repo.Name, commit.Sha, "error: context canceled", "Done")
 		assert.Equals(t, expGistStr, gistString)
 	})
 }
@@ -106,7 +131,7 @@ func TestCancel(t *testing.T) {
 // test helper functions
 func formatGistOutput(repoName, commitSha, scriptOutput, afterScriptOutput string) string {
 	var sb strings.Builder
-	sb.WriteString("## Script Results\n```")
+	sb.WriteString("## Script Results\n```\n")
 	sb.WriteString(scriptOutput)
 	sb.WriteString("\n```\n## After Script Results\n```\n")
 	sb.WriteString(afterScriptOutput)
@@ -193,11 +218,11 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	b1 := &ghclient.Blob{
 		Sha:     "b1",
 		Content: base64.StdEncoding.EncodeToString(content),
-		Path:    "t0/ci.yml",
+		Path:    "ci.yml",
 	}
 	t0.SetChild(b1)
 
-	log, err := logging.NewLogger(logging.NONE, "console")
+	log, err := logging.NewLogger(logging.DEBUG, "console")
 	if err != nil {
 		panic(err)
 	}
@@ -251,7 +276,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	}
 
 	serverResponses[gh.Api.GistURL()] = func(req *http.Request) (*http.Response, error) {
-		body := `{"url":"` + gh.Api.GistURL() + `/testgist"}`
+		body := `{"url":"` + gh.Api.GistURL() + `/testgist", "id":"newgist"}`
 		res, _ := ioutil.ReadAll(req.Body)
 		gistString = string(res)
 		return &http.Response{

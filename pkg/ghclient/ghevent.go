@@ -21,7 +21,7 @@ func EventFactory(incoming string) (Event, error) {
 	if e := events[incoming]; e != nil {
 		return e, nil
 	}
-	return nil, fmt.Errorf("received error %s does not exist", incoming)
+	return nil, fmt.Errorf("unknown event type '%s'", incoming)
 }
 
 // Push implements github Event interface

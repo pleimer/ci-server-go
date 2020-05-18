@@ -13,10 +13,11 @@ const (
 	FAILURE
 	PENDING
 	SUCCESS
+	NONE
 )
 
 func (cs CommitState) String() string {
-	return [...]string{"error", "failure", "pending", "success"}[cs]
+	return [...]string{"error", "failure", "pending", "success", ""}[cs]
 }
 
 // Status github status object
