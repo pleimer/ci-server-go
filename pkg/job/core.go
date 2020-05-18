@@ -89,7 +89,7 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	fmt.Println(cj.scriptOutput)
+	fmt.Println(string(cj.scriptOutput))
 	if err != nil {
 		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("job failed with: %s", err), "")
 		cj.scriptOutput = []byte(fmt.Sprintf("%s\nerror(%s) %s\n", cj.scriptOutput, err, err.(*exec.ExitError).Stderr))

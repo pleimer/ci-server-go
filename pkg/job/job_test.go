@@ -51,7 +51,7 @@ func TestPushJob(t *testing.T) {
 	})
 
 	t.Run("script fail", func(t *testing.T) {
-		_, github, repo, ref, commit, log, _ := genTestEnvironment([]string{"exit 1"}, []string{"echo Done"})
+		_, github, repo, ref, commit, log, _ := genTestEnvironment([]string{"./ci.sh"}, []string{"echo Done"})
 		path := "/tmp"
 		deleteFiles(path)
 
@@ -220,6 +220,13 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 		Content: base64.StdEncoding.EncodeToString(content),
 		Path:    "ci.yml",
 	}
+
+	b2 := &ghclient.Blob{
+		Sha:     "b2",
+		Content: base64.StdEncoding.EncodeToString([]byte("exit 1")),
+		Path:    "ci.sh",
+	}
+	t0.SetChild(b2)
 	t0.SetChild(b1)
 
 	log, err := logging.NewLogger(logging.DEBUG, "console")
