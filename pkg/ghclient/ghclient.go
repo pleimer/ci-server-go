@@ -60,6 +60,9 @@ func (c *Client) Listen(wg *sync.WaitGroup, address string, log *logging.Logger)
 		w.Write([]byte("Hello!"))
 	})
 	http.HandleFunc("/webhook", func(w http.ResponseWriter, req *http.Request) {
+		log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook"})
+		log.Debug("received event")
+
 		ev, err := EventFactory(req.Header.Get("X-Github-Event"))
 		if err != nil {
 			log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook", "error": err})
@@ -71,9 +74,12 @@ func (c *Client) Listen(wg *sync.WaitGroup, address string, log *logging.Logger)
 			log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook"})
 			log.Error(fmt.Sprintf("error in event payload: %s", err))
 		}
-		log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook"})
-		log.Debug("received payload")
-		ev.Handle(c, json)
+		err = ev.Handle(c, json)
+		if err != nil {
+			log.Metadata(map[string]interface{}{"module": "ghclient", "endpoint": "/webhook", "error": err.Error()})
+			log.Error("problem handling event")
+		}
+
 		c.EventChan <- ev
 	})
 

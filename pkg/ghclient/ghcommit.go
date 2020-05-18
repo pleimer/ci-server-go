@@ -56,18 +56,22 @@ func (c *Commit) SetStatus(state CommitState, message string, targetURL string) 
 }
 
 // GetParent returns copy of parent commit
-func (c *Commit) GetParent() Commit {
-	return *(c.parent)
+func (c *Commit) GetParent() *Commit {
+	return c.parent
 }
 
 func (c *Commit) setChild(child *Commit) {
-	child.parent = c
+	if child != nil {
+		child.parent = c
+	}
 	c.child = child
 }
 
 func (c *Commit) setParent(parent *Commit) {
 	c.parent = parent
-	parent.child = c
+	if parent != nil {
+		parent.child = c
+	}
 }
 
 func (c *Commit) String() string {
@@ -86,4 +90,11 @@ func NewCommitFromJSON(commitJSON []byte) (*Commit, error) {
 		commit.Sha = commit.ID
 	}
 	return commit, nil
+}
+
+func commitError(msg string) error {
+	return &GithubClientError{
+		module: "Commit",
+		err:    msg,
+	}
 }

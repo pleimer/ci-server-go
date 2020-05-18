@@ -49,7 +49,7 @@ func (p *PushJob) Run(ctx context.Context) {
 	cj := newCoreJob(p.client, p.event.Repo, *commit)
 	cj.BasePath = "/tmp/"
 
-	err := cj.getResources()
+	err := cj.getTree()
 	if err != nil {
 		switch err.(type) {
 		case *os.PathError:
@@ -61,6 +61,13 @@ func (p *PushJob) Run(ctx context.Context) {
 			cj.postResults()
 			return
 		}
+	}
+
+	err = cj.loadSpec()
+	if err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		p.Log.Error("failed to load spec")
+		return
 	}
 
 	err = cj.runScript(ctx)

@@ -67,6 +67,7 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 
 	workChan := make(chan func())
 	for w := 0; w < jb.numWorkers; w++ {
+		jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
 		jb.log.Debug(fmt.Sprintf("created worker #%d", w))
 		wg.Add(1)
 		go jb.worker(ctx, wg, w, workChan)
@@ -78,11 +79,13 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 		for {
 			j, ok := <-jb.jobQueue
 			if !ok {
+				jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
 				jb.log.Debug("job queue disposed")
 				return
 			}
 			if runningJob, ok := jb.runningJobs.Get(j.GetRepoName(), j.GetRefName()); ok {
 				runningJob.cancel()
+				jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
 				jb.log.Info(fmt.Sprintf("conflicting job for repository %s, ref %s - cancelled running job", j.GetRepoName(), j.GetRefName()))
 			}
 			jCtx, jCancel := context.WithTimeout(ctx, jb.jobTime)
@@ -103,7 +106,8 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 			jb.jobQueue <- j
 		case <-ctx.Done():
 			close(jb.jobQueue)
-			jb.log.Info("job manager exited")
+			jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
+			jb.log.Info("exited")
 			return
 		}
 	}
@@ -115,11 +119,14 @@ func (jb *JobManager) worker(ctx context.Context, wg *sync.WaitGroup, num int, w
 	for {
 		select {
 		case <-ctx.Done():
+			jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
 			jb.log.Debug(fmt.Sprintf("worker #%d exited", num))
 			return
 		case j := <-workerChan:
+			jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
 			jb.log.Info(fmt.Sprintf("worker #%d running job", num))
 			j()
+			jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
 			jb.log.Info(fmt.Sprintf("worker #%d completed job", num))
 		}
 	}

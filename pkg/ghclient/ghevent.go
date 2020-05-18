@@ -37,7 +37,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	eventMap := make(map[string]json.RawMessage)
 	err := json.Unmarshal(pushJSON, &eventMap)
 	if err != nil {
-		return fmt.Errorf("failed parsing push event json: %s", err)
+		return pushEventError(fmt.Sprintf("failed parsing push event json: %s", err))
 	}
 
 	repo, err := NewRepositoryFromJSON(eventMap["repository"])
@@ -52,7 +52,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	var cSliceJSON []json.RawMessage
 	err = json.Unmarshal(eventMap["commits"], &cSliceJSON)
 	if err != nil {
-		return fmt.Errorf("failed parsing list of commits: %s", err)
+		return pushEventError(fmt.Sprintf("failed parsing list of commits: %s", err))
 	}
 
 	// build up commit slive to create list from
@@ -60,7 +60,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	if len(cSliceJSON) == 0 {
 		headCommit := eventMap["head_commit"]
 		if headCommit == nil {
-			return fmt.Errorf("no commits arrived with event")
+			return pushEventError("no commits arrived with event")
 		}
 		cSliceJSON = append(cSliceJSON, headCommit)
 	}
@@ -68,7 +68,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	for _, cJSON := range cSliceJSON {
 		c, err := NewCommitFromJSON(cJSON)
 		if err != nil {
-			return fmt.Errorf("failed creating commit object from JSON: %s", err)
+			return pushEventError(fmt.Sprintf("failed creating commit object from JSON: %s", err))
 		}
 		cSlice = append(cSlice, *c)
 	}
@@ -84,11 +84,26 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	cSlice = nil
 
 	refName := string(eventMap["ref"])
+	if refName == "" {
+		return pushEventError("no reference found in event message")
+	}
 	p.RefName = refName
 	client.repositories[repo.Name].registerCommits(head, refName)
 	client.Cache.WriteCommits(head)
 
-	p.Repo = *repo
-	p.Ref = repo.GetReference(refName)
+	// p.Repo = *repo
+	p.Repo = *client.repositories[repo.Name]
+	if p.Repo.GetReference(refName) == nil {
+		return pushEventError("failed to retrieve reference from repository")
+	}
+
+	p.Ref = *p.Repo.GetReference(refName)
 	return nil
+}
+
+func pushEventError(msg string) error {
+	return &GithubClientError{
+		module: "Push",
+		err:    msg,
+	}
 }
