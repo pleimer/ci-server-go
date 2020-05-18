@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/infrawatch/ci-server-go/pkg/assert"
+	"github.com/pleimer/ci-server-go/pkg/assert"
 )
 
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

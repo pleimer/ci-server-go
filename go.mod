@@ -1,4 +1,4 @@
-module github.com/infrawatch/ci-server-go
+module github.com/pleimer/ci-server-go
 
 go 1.14
 

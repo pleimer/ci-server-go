@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/infrawatch/ci-server-go/pkg/assert"
-	"github.com/infrawatch/ci-server-go/pkg/ghclient"
-	"github.com/infrawatch/ci-server-go/pkg/logging"
-	"github.com/infrawatch/ci-server-go/pkg/parser"
+	"github.com/pleimer/ci-server-go/pkg/assert"
+	"github.com/pleimer/ci-server-go/pkg/ghclient"
+	"github.com/pleimer/ci-server-go/pkg/logging"
+	"github.com/pleimer/ci-server-go/pkg/parser"
 	"gopkg.in/yaml.v2"
 )
 

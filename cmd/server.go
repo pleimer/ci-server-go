@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
 
-	"github.com/infrawatch/ci-server-go/pkg/server"
+	"github.com/pleimer/ci-server-go/pkg/server"
 )
 
 func main() {
@@ -32,4 +33,5 @@ func main() {
 	server.Run(ctx, &wg)
 	wg.Wait()
 	// Print log of successful exit right here
+	fmt.Println("server exited cleanly")
 }

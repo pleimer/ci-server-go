@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/infrawatch/ci-server-go/pkg/assert"
-	"github.com/infrawatch/ci-server-go/pkg/logging"
+	"github.com/pleimer/ci-server-go/pkg/assert"
+	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
 func TestAuthenticate(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/golang-collections/go-datastructures/queue"
-	"github.com/infrawatch/ci-server-go/pkg/ghclient"
-	"github.com/infrawatch/ci-server-go/pkg/logging"
+	"github.com/pleimer/ci-server-go/pkg/ghclient"
+	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
 // PushJob contains logic for dealing with github push events

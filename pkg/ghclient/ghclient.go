@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/infrawatch/ci-server-go/pkg/logging"
+	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
 // Client github client object

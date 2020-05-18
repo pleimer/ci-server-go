@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/infrawatch/ci-server-go/pkg/ghclient"
-	"github.com/infrawatch/ci-server-go/pkg/parser"
+	"github.com/pleimer/ci-server-go/pkg/ghclient"
+	"github.com/pleimer/ci-server-go/pkg/parser"
 )
 
 // coreJob contains processes for the stages of running a script in a repository, generating and posting reports
