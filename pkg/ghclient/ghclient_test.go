@@ -49,7 +49,6 @@ func TestAuthenticate(t *testing.T) {
 		api.Client = client
 
 		err := api.Authenticate(oauth)
-		t.Log(err)
 		assert.Assert(t, (err != nil), "Should have been an error")
 	})
 }

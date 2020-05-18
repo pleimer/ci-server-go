@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/infrawatch/ci-server-go/pkg/config"
-	"github.com/infrawatch/ci-server-go/pkg/ghclient"
-	"github.com/infrawatch/ci-server-go/pkg/job"
-	"github.com/infrawatch/ci-server-go/pkg/logging"
+	"github.com/pleimer/ci-server-go/pkg/config"
+	"github.com/pleimer/ci-server-go/pkg/ghclient"
+	"github.com/pleimer/ci-server-go/pkg/job"
+	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
 // Run server main function

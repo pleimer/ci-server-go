@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/golang-collections/go-datastructures/queue"
-	"github.com/infrawatch/ci-server-go/pkg/assert"
-	"github.com/infrawatch/ci-server-go/pkg/job"
-	"github.com/infrawatch/ci-server-go/pkg/logging"
+	"github.com/pleimer/ci-server-go/pkg/assert"
+	"github.com/pleimer/ci-server-go/pkg/job"
+	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
 type TestJob struct {

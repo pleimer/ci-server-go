@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/infrawatch/ci-server-go/pkg/job"
-	"github.com/infrawatch/ci-server-go/pkg/logging"
 	cmap "github.com/orcaman/concurrent-map"
+	"github.com/pleimer/ci-server-go/pkg/job"
+	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
 // job wrapper that pairs cancel function with running job
