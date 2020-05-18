@@ -46,7 +46,7 @@ func TestPushJob(t *testing.T) {
 		}
 
 		pj.Run(context.Background())
-		expGistStr := formatGistOutput(repo.Name, commit.Sha, "stf", "Done")
+		expGistStr := formatGistOutput(repo.Name, commit.Sha, "t0", "Done")
 		assert.Equals(t, expGistStr, gistString)
 	})
 
@@ -187,7 +187,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 		Global: &parser.Global{
 			Timeout: 300,
 			Env: map[string]interface{}{
-				"OCP_PROJECT": "stf",
+				"OCP_PROJECT": "__commit__",
 			},
 		},
 		Script:      script,

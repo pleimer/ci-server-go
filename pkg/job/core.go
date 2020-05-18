@@ -62,6 +62,7 @@ func (cj *coreJob) loadSpec() error {
 		return err
 	}
 	cj.spec, err = parser.NewSpecFromYAML(f)
+	cj.spec.SetMetaVar("__commit__", cj.commit.Sha)
 	if err != nil {
 		return err
 	}
@@ -74,7 +75,7 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 
 	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
 	cj.postCommitStatus()
-	cj.commit.SetStatus(ghclient.SUCCESS, "all tests passed", "")
+	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", "")
 
 	// run script with timeout
 	cj.scriptOutput, err = cj.spec.ScriptCmd(ctx, cj.BasePath).Output()
@@ -89,9 +90,8 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	fmt.Println(string(cj.scriptOutput))
 	if err != nil {
-		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("job failed with: %s", err), "")
+		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("script failed: %s", err), "")
 		cj.scriptOutput = []byte(fmt.Sprintf("%s\nerror(%s) %s\n", cj.scriptOutput, err, err.(*exec.ExitError).Stderr))
 		return err
 	}
@@ -115,7 +115,7 @@ func (cj *coreJob) runAfterScript(ctx context.Context) error {
 	}
 
 	if err != nil {
-		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("after_script failed with: %s", err), "")
+		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("after_script failed: %s", err), "")
 		cj.afterScriptOutput = []byte(fmt.Sprintf("%s\nerror(%s) %s\n", cj.afterScriptOutput, err, err.(*exec.ExitError).Stderr))
 		return err
 	}

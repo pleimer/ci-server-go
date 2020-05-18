@@ -25,7 +25,7 @@ type Status struct {
 	State       string `json:"state"`
 	TargetURL   string `json:"target_url"`
 	Description string `json:"description"`
-	Context     string `json:"context`
+	Context     string `json:"context"`
 }
 
 // Commit resource tracking a github commit

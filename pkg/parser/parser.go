@@ -30,6 +30,12 @@ type Spec struct {
 	Global      *Global  `yaml:"global"`
 	Script      []string `yaml:"script"`
 	AfterScript []string `yaml:"after_script"`
+
+	metaVars map[string]string
+}
+
+func (s *Spec) SetMetaVar(key, val string) {
+	s.metaVars[key] = val
 }
 
 func (s *Spec) ScriptCmd(ctx context.Context, basePath string) *exec.Cmd {
@@ -54,10 +60,14 @@ func (s *Spec) genEnv(ctx context.Context, comList []string) *exec.Cmd {
 		case int:
 			newEnv = append(newEnv, key+"="+strconv.Itoa(v))
 		case string:
-			newEnv = append(newEnv, key+"="+v)
-
+			if meta, ok := s.metaVars[v]; ok {
+				newEnv = append(newEnv, key+"="+meta)
+			} else {
+				newEnv = append(newEnv, key+"="+v)
+			}
 		}
 	}
+
 	cmd.Env = append(os.Environ(), newEnv...)
 	return cmd
 }
@@ -76,5 +86,6 @@ func NewSpecFromYAML(yamlSpec io.Reader) (*Spec, error) {
 	if spec.Global == nil {
 		spec.Global = &Global{}
 	}
+	spec.metaVars = make(map[string]string)
 	return &spec, nil
 }
