@@ -1,11 +1,14 @@
 package job
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -55,9 +58,9 @@ func (cj *coreJob) loadSpec() error {
 	if err != nil {
 		return err
 	}
-	cj.BasePath = strings.Join([]string{cj.BasePath, tree.Path}, "/")
+	cj.BasePath = filepath.Join(cj.BasePath, tree.Path)
 
-	f, err := os.Open(cj.yamlPath(tree))
+	f, err := os.Open(filepath.Join(cj.BasePath, "ci.yml"))
 	defer f.Close()
 	if err != nil {
 		return err
@@ -80,8 +83,48 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 
 	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
 	defer cancel()
-	// run script with timeout
-	cj.scriptOutput, err = cj.spec.ScriptCmd(scriptCtx, cj.BasePath).Output()
+
+	cmd := cj.spec.ScriptCmd(scriptCtx, cj.BasePath)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("failed launching script: %s", err), "")
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("failed launching script: %s", err), "")
+		return err
+	}
+
+	reader := bufio.NewReader(stdout)
+	logPath := filepath.Join(cj.BasePath, fmt.Sprintf("%s.log", cj.commit.Sha))
+
+	f, err := os.Create(logPath)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	bw := bufio.NewWriterSize(f, 50)
+	bw.Write([]byte("## Script Results\n```\n"))
+
+	for {
+		res, err := reader.ReadBytes('\n')
+		if err != nil {
+			if err != io.EOF {
+				bw.Write([]byte(err.Error()))
+			}
+			break
+		}
+		bw.Write(res)
+	}
+	bw.Write([]byte("\n```"))
+	err = bw.Flush()
+	if err != nil {
+		return err
+	}
+
 	if ctx.Err() != nil {
 		if ctx.Err() == context.Canceled {
 			cj.commit.SetStatus(ghclient.ERROR, "script canceled", "")
@@ -89,13 +132,13 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 		if ctx.Err() == context.DeadlineExceeded {
 			cj.commit.SetStatus(ghclient.FAILURE, "main script timed out", "")
 		}
-		cj.scriptOutput = []byte(fmt.Sprintf("%serror: %s\n", cj.scriptOutput, err))
+		bw.Write([]byte(err.Error()))
 		return ctx.Err()
 	}
 
 	if err != nil {
 		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("script failed: %s", err), "")
-		cj.scriptOutput = []byte(fmt.Sprintf("%s\nerror(%s) %s\n", cj.scriptOutput, err, err.(*exec.ExitError).Stderr))
+		bw.Write([]byte(fmt.Sprintf("\nerror(%s) %s\n", err, err.(*exec.ExitError).Stderr)))
 		return err
 	}
 	return nil
@@ -166,10 +209,6 @@ func (cj *coreJob) postResults(user string) error {
 }
 
 // ----------- helper functions ---------------
-func (cj *coreJob) yamlPath(tree *ghclient.Tree) string {
-	return strings.Join([]string{cj.BasePath, "ci.yml"}, "/")
-}
-
 // build report in markdown format
 func (cj *coreJob) buildReport() []byte {
 	var sb strings.Builder
@@ -187,7 +226,7 @@ func (cj *coreJob) buildReport() []byte {
 	return []byte(sb.String())
 }
 
-// helper function post commit status to gh client
+// post commit status to gh client
 func (cj *coreJob) getGistPublishedURL(id, user string) string {
 	return fmt.Sprintf("https://gist.github.com/%s/%s", user, id)
 }
