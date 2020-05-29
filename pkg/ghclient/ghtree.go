@@ -260,12 +260,12 @@ func WriteTreeToDirectory(top Node, basePath string) error {
 			if err != nil {
 				return nil, err
 			}
+			defer f.Close()
 
 			ft := strings.Split(b.Path, ".")
 			if ft[len(ft)-1] == "sh" {
 				f.Chmod(0777)
 			}
-			defer f.Close()
 			b.Write(f)
 			return path, nil
 		})

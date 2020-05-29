@@ -57,7 +57,7 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
 		case ev := <-evChan:
-			j, err := job.Factory(ev, &gh, log)
+			j, err := job.Factory(ev, &gh, log, config.Organization)
 			if err != nil {
 				log.Metadata(map[string]interface{}{"process": "server", "error": err})
 				log.Error("failed creating job from event")

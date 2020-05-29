@@ -86,6 +86,10 @@ func NewSpecFromYAML(yamlSpec io.Reader) (*Spec, error) {
 	if spec.Global == nil {
 		spec.Global = &Global{}
 	}
+
+	if spec.Global.Timeout == 0 {
+		spec.Global.Timeout = 300
+	}
 	spec.metaVars = make(map[string]string)
 	return &spec, nil
 }

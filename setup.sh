@@ -1,4 +1,4 @@
 #!/bin/bash
 
-export ORGANIZATION=infrawatch
+export ORGANIZATION=pleimer
 export OAUTH=$(cat ~/accessgit)

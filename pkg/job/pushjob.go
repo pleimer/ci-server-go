@@ -3,7 +3,6 @@ package job
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
@@ -16,6 +15,7 @@ type PushJob struct {
 	client            *ghclient.Client
 	scriptOutput      []byte
 	afterScriptOutput []byte
+	user              string
 
 	BasePath string
 	Log      *logging.Logger
@@ -55,7 +55,7 @@ func (p *PushJob) Run(ctx context.Context) {
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Error("failed to get resources")
-		err = cj.postResults()
+		err = cj.postResults(p.user)
 		if err != nil {
 			p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 			p.Log.Error("failed to post results")
@@ -72,6 +72,8 @@ func (p *PushJob) Run(ctx context.Context) {
 		return
 	}
 
+	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	p.Log.Info("running main script")
 	err = cj.runScript(ctx)
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
@@ -86,9 +88,9 @@ func (p *PushJob) Run(ctx context.Context) {
 	// 'After script' is responsible for cleaning up resources, so it must run even when a cancel signal
 	// has been sent by the main server goroutine. This still garauntees an exit after timeout
 	// so it isn't too terrible
-	ctxTimeoutAfterScrip, cancelAfterScript := context.WithTimeout(context.Background(), time.Second*300)
-	defer cancelAfterScript()
-	err = cj.runAfterScript(ctxTimeoutAfterScrip)
+	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	p.Log.Info("running after script")
+	err = cj.runAfterScript(context.Background())
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("after_script failed")
@@ -98,7 +100,7 @@ func (p *PushJob) Run(ctx context.Context) {
 	}
 	p.handleContextError(err)
 
-	err = cj.postResults()
+	err = cj.postResults(p.user)
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("failed to post results")

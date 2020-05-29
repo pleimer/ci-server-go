@@ -36,13 +36,14 @@ type Job interface {
 }
 
 // Factory generate jobs based on event type
-func Factory(event ghclient.Event, client *ghclient.Client, log *logging.Logger) (Job, error) {
+func Factory(event ghclient.Event, client *ghclient.Client, log *logging.Logger, user string) (Job, error) {
 	switch e := event.(type) {
 	case *ghclient.Push:
 		return &PushJob{
 			event:  e,
 			client: client,
 			Log:    log,
+			user:   user,
 		}, nil
 	}
 	return nil, fmt.Errorf("failed creating job: could not determine github event type")

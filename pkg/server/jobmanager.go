@@ -57,7 +57,6 @@ func NewJobManager(numWorkers int, log *logging.Logger) *JobManager {
 		jobQueue:    make(chan job.Job, 100),
 		log:         log,
 		numWorkers:  numWorkers,
-		jobTime:     time.Second * 300,
 	}
 }
 
@@ -88,7 +87,7 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 				jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
 				jb.log.Info(fmt.Sprintf("conflicting job for repository %s, ref %s - cancelled running job", j.GetRepoName(), j.GetRefName()))
 			}
-			jCtx, jCancel := context.WithTimeout(ctx, jb.jobTime)
+			jCtx, jCancel := context.WithCancel(ctx)
 			jb.runningJobs.Set(j.GetRepoName(), j.GetRefName(), &jobContext{
 				job:    j,
 				cancel: jCancel,
