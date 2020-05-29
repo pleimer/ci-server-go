@@ -25,7 +25,7 @@ type Writer struct {
 // NewWriter create Writer with initialized buffer
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
-		writer: bufio.NewWriterSize(w, 50),
+		writer: bufio.NewWriterSize(w, 1000),
 	}
 }
 
@@ -58,7 +58,7 @@ func (rw *Writer) CloseBlock() int {
 		return n
 	}
 	rw.blockOpened = false
-	n, rw.err = rw.writer.WriteString("```\n")
+	n, rw.err = rw.writer.WriteString("\n```\n")
 	return n
 }
 
@@ -74,20 +74,8 @@ func (rw *Writer) AddTitle(msg string) int {
 		return n
 	}
 
-	total := 0
-	if n, rw.err = rw.writer.WriteString("## "); rw.err != nil {
-		return total
-	}
-	total += n
-
-	if n, rw.err = rw.writer.WriteString(msg); rw.err != nil {
-		return total
-	}
-	total += n
-	if n, rw.err = rw.writer.WriteString("\n"); rw.err != nil {
-		return total
-	}
-	return total + n
+	n, rw.err = rw.writer.WriteString(fmt.Sprintf("\n## %s\n", msg))
+	return n
 }
 
 func (rw *Writer) Write(msg string) int {
@@ -96,7 +84,7 @@ func (rw *Writer) Write(msg string) int {
 		return n
 	}
 
-	n, rw.err = rw.writer.WriteString(fmt.Sprintf("%s\n", msg))
+	n, rw.err = rw.writer.WriteString(msg)
 	return n
 }
 
