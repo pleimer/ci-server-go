@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
 	"github.com/pleimer/ci-server-go/pkg/parser"
+	"github.com/pleimer/ci-server-go/pkg/report"
 )
 
 // coreJob contains processes for the stages of running a script in a repository, generating and posting reports
@@ -73,30 +73,23 @@ func (cj *coreJob) loadSpec() error {
 	return nil
 }
 
-// runs spec.Script
-func (cj *coreJob) runScript(ctx context.Context) error {
+//runs a script and writes buffered output to file and gist writer
+func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, title string) error {
 	var err error
 
-	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
-	cj.postCommitStatus()
-	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", "")
-
-	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
-	defer cancel()
-
-	cmd := cj.spec.ScriptCmd(scriptCtx, cj.BasePath)
-	stdout, err := cmd.StdoutPipe()
+	stdout, err := script.StdoutPipe()
 	if err != nil {
-		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("failed launching script: %s", err), "")
 		return err
 	}
 
-	if err := cmd.Start(); err != nil {
-		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("failed launching script: %s", err), "")
+	script.Stderr = script.Stdout //want stderr in same pipe as stdout
+
+	if err := script.Start(); err != nil {
 		return err
 	}
 
-	reader := bufio.NewReader(stdout)
+	//reader := bufio.NewReader(stdout)
+	scanner := bufio.NewScanner(stdout)
 	logPath := filepath.Join(cj.BasePath, fmt.Sprintf("%s.log", cj.commit.Sha))
 
 	f, err := os.Create(logPath)
@@ -106,39 +99,64 @@ func (cj *coreJob) runScript(ctx context.Context) error {
 
 	defer f.Close()
 
-	bw := bufio.NewWriterSize(f, 50)
-	bw.Write([]byte("## Script Results\n```\n"))
+	//TODO: add new writer for gists here
+	bwFile := report.NewWriter(f)
+	bwFile.AddTitle(title)
+	if bwFile.Err() != nil {
+		return bwFile.Err()
+	}
+	bwFile.OpenBlock()
 
-	for {
-		res, err := reader.ReadBytes('\n')
-		if err != nil {
-			if err != io.EOF {
-				bw.Write([]byte(err.Error()))
-			}
-			break
+	scriptDone := make(chan struct{})
+	go func() {
+		script.Wait()
+	}()
+
+	select {
+	case <-scriptDone:
+		break
+	default:
+		for scanner.Scan() {
+			bwFile.Write(scanner.Text())
 		}
-		bw.Write(res)
 	}
-	bw.Write([]byte("\n```"))
-	err = bw.Flush()
-	if err != nil {
-		return err
-	}
+	err = scanner.Err()
 
 	if ctx.Err() != nil {
-		if ctx.Err() == context.Canceled {
-			cj.commit.SetStatus(ghclient.ERROR, "script canceled", "")
-		}
-		if ctx.Err() == context.DeadlineExceeded {
-			cj.commit.SetStatus(ghclient.FAILURE, "main script timed out", "")
-		}
-		bw.Write([]byte(err.Error()))
+		bwFile.Write(fmt.Sprintf("\nerror: %s", ctx.Err()))
+		bwFile.CloseBlock()
+		bwFile.Flush()
 		return ctx.Err()
 	}
 
 	if err != nil {
-		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("script failed: %s", err), "")
-		bw.Write([]byte(fmt.Sprintf("\nerror(%s) %s\n", err, err.(*exec.ExitError).Stderr)))
+		bwFile.Write(fmt.Sprintf("\nerror: %s", err))
+		bwFile.CloseBlock()
+		bwFile.Flush()
+		return err
+	}
+
+	bwFile.CloseBlock()
+	bwFile.Flush()
+	if bwFile.Err() != nil {
+		return bwFile.Err()
+	}
+
+	return nil
+}
+
+// runs spec.Script
+func (cj *coreJob) RunMainScript(ctx context.Context) error {
+	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
+	cj.postCommitStatus()
+	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", "")
+
+	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
+	defer cancel()
+
+	cmd := cj.spec.ScriptCmd(scriptCtx, cj.BasePath)
+	err := cj.runScript(scriptCtx, cmd, "main script")
+	if err != nil {
 		return err
 	}
 	return nil

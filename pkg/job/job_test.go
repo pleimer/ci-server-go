@@ -100,7 +100,7 @@ func TestPushJob(t *testing.T) {
 }
 
 func TestCancel(t *testing.T) {
-	spec, github, repo, _, commit, _, _ := genTestEnvironment([]string{"sleep 10"}, []string{"sleep 10"})
+	spec, github, repo, _, commit, _, _ := genTestEnvironment([]string{"echo starting", "sleep 5", "echo ending"}, []string{"sleep 1"})
 
 	cjUT := newCoreJob(github, *repo, commit)
 	cjUT.spec = spec
@@ -108,7 +108,7 @@ func TestCancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 
 	t.Run("script timeout", func(t *testing.T) {
-		err := cjUT.runScript(ctx)
+		err := cjUT.RunMainScript(ctx)
 		assert.Equals(t, context.DeadlineExceeded, err)
 	})
 	cancel()
@@ -123,7 +123,7 @@ func TestCancel(t *testing.T) {
 	ctx, cancel = context.WithTimeout(context.Background(), time.Millisecond*100)
 	t.Run("script cancel", func(t *testing.T) {
 		cancel()
-		err := cjUT.runScript(ctx)
+		err := cjUT.RunMainScript(ctx)
 		assert.Equals(t, context.Canceled, err)
 	})
 }

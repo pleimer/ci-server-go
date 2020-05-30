@@ -74,7 +74,7 @@ func (p *PushJob) Run(ctx context.Context) {
 
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("running main script")
-	err = cj.runScript(ctx)
+	err = cj.RunMainScript(ctx)
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("script failed")
