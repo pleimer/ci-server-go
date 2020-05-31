@@ -35,7 +35,7 @@ func getWebhook() map[string]interface{} {
 
 func TestHandle(t *testing.T) {
 	t.Run("null event", func(t *testing.T) {
-		gh := NewClient(nil)
+		gh := NewClient(nil, "testuser")
 
 		pushEvent := &Push{}
 
@@ -48,7 +48,7 @@ func TestHandle(t *testing.T) {
 		testRepoJSON, err := json.Marshal(webhook)
 
 		assert.Ok(t, err)
-		gh := NewClient(nil)
+		gh := NewClient(nil, "testuser")
 
 		pushEvent := &Push{}
 
@@ -78,7 +78,7 @@ func TestHandle(t *testing.T) {
 		testRepoJSON, err := json.Marshal(webhook)
 
 		assert.Ok(t, err)
-		gh := NewClient(nil)
+		gh := NewClient(nil, "testuser")
 
 		pushEvent := &Push{}
 
@@ -121,7 +121,7 @@ func TestHandle(t *testing.T) {
 		testRepoJSON, err := json.Marshal(webhook)
 		assert.Ok(t, err)
 
-		gh := NewClient(nil)
+		gh := NewClient(nil, "testuser")
 
 		pushEvent := &Push{}
 
@@ -147,7 +147,7 @@ func TestHandle(t *testing.T) {
 		testRepoJSON, err := json.Marshal(webhook)
 		assert.Ok(t, err)
 
-		gh := NewClient(nil)
+		gh := NewClient(nil, "testuser")
 
 		pushEvent := &Push{}
 
@@ -162,7 +162,7 @@ func TestHandle(t *testing.T) {
 		testRepoJSON, err := json.Marshal(webhook)
 
 		assert.Ok(t, err)
-		gh := NewClient(nil)
+		gh := NewClient(nil, "testuser")
 
 		pushEvent := &Push{}
 

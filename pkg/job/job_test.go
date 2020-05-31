@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -110,9 +111,12 @@ func TestFailedScript(t *testing.T) {
 	cjUT.spec = spec
 
 	err := cjUT.RunMainScript(context.Background(), writer, "")
-	t.Log(sb.String())
-	t.Log(err.Error())
-
+	switch e := err.(type) {
+	case *exec.ExitError:
+		return
+	default:
+		t.Errorf("wrong error type. Error was: %s", e)
+	}
 }
 
 func TestCancel(t *testing.T) {
@@ -247,7 +251,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	t0.SetChild(b2)
 	t0.SetChild(b1)
 
-	log, err := logging.NewLogger(logging.DEBUG, "console")
+	log, err := logging.NewLogger(logging.NONE, "console")
 	if err != nil {
 		panic(err)
 	}
@@ -281,7 +285,7 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 	api := ghclient.NewAPI()
 	api.Client = client
 
-	gh := ghclient.NewClient(nil)
+	gh := ghclient.NewClient(nil, "testuser")
 	gh.Api = api
 
 	ref := ghclient.Reference{}

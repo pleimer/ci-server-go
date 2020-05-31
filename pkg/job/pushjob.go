@@ -53,7 +53,7 @@ func (p *PushJob) Run(ctx context.Context) {
 
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("downloading git tree")
-	err := cj.getTree()
+	err := cj.GetTree()
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Error("retrieving resources")
@@ -62,7 +62,7 @@ func (p *PushJob) Run(ctx context.Context) {
 
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("loading test specifications")
-	err = cj.loadSpec()
+	err = cj.LoadSpec()
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Error("failed to load spec")

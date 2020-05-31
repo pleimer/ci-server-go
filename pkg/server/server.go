@@ -36,7 +36,7 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 
 	evChan := make(chan ghclient.Event)
 
-	gh := ghclient.NewClient(evChan)
+	gh := ghclient.NewClient(evChan, config.User)
 	err = gh.Api.Authenticate(strings.NewReader(config.Oauth))
 	if err != nil {
 		log.Error(err.Error())
@@ -57,7 +57,7 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
 		case ev := <-evChan:
-			j, err := job.Factory(ev, &gh, log, config.Organization)
+			j, err := job.Factory(ev, &gh, log)
 			if err != nil {
 				log.Metadata(map[string]interface{}{"process": "server", "error": err})
 				log.Error("failed creating job from event")

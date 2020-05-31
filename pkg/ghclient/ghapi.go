@@ -191,6 +191,10 @@ func (a *API) UpdateGistURL(ID string) string {
 	return a.makeURL([]string{"gists", ID})
 }
 
+func (a *API) PublishedGistURL(id, user string) string {
+	return fmt.Sprintf("https://gist.github.com/%s/%s", user, id)
+}
+
 func (a *API) makeURL(items []string, params ...string) string {
 	var sb strings.Builder
 	sb.WriteString(a.BaseURL)

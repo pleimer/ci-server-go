@@ -13,6 +13,7 @@ import (
 // Client github client object
 type Client struct {
 	EventChan chan Event
+	User      string
 
 	Api          API
 	Cache        Cache
@@ -22,9 +23,10 @@ type Client struct {
 }
 
 // NewClient create a new github Client
-func NewClient(eventChan chan Event) Client {
+func NewClient(eventChan chan Event, user string) Client {
 	return Client{
 		Api:          NewAPI(),
+		User:         user,
 		repositories: make(map[string]*Repository),
 		Cache:        NewCache(),
 		EventChan:    eventChan,

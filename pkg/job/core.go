@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -40,7 +39,7 @@ func newCoreJob(client *ghclient.Client, repo ghclient.Repository, commit ghclie
 	return &cj
 }
 
-func (cj *coreJob) getTree() error {
+func (cj *coreJob) GetTree() error {
 	tree, err := cj.client.GetTree(cj.commit.Sha, cj.repo)
 	if err != nil {
 		return err
@@ -53,7 +52,7 @@ func (cj *coreJob) getTree() error {
 	return nil
 }
 
-func (cj *coreJob) loadSpec() error {
+func (cj *coreJob) LoadSpec() error {
 	tree, err := cj.client.GetTree(cj.commit.Sha, cj.repo)
 	if err != nil {
 		return err
@@ -103,9 +102,6 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 	go func() {
 		defer wg.Done()
 		scriptErr = script.Wait()
-		if scriptErr != nil {
-			fmt.Println("Script err " + scriptErr.Error())
-		}
 		scriptDone <- struct{}{}
 	}()
 
@@ -138,7 +134,6 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 	}
 
 	if scriptErr != nil {
-		fmt.Println("There was an error in the script")
 		writer.Write(fmt.Sprintf("\n[ci-server] script error: %s", scriptErr))
 		writer.CloseBlock()
 		writer.Flush()
@@ -165,13 +160,15 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 
 // runs spec.Script
 func (cj *coreJob) RunMainScript(ctx context.Context, writer *report.Writer, gistID string) error {
-	gistURL := cj.getGistPublishedURL(gistID, cj.repo.Owner.Login)
+	gistURL := cj.client.Api.PublishedGistURL(gistID, cj.client.User)
+
 	cj.commit.SetStatus(ghclient.PENDING, "pending", gistURL)
 	cj.postCommitStatus()
 	cj.commit.SetStatus(ghclient.SUCCESS, "main script successful", gistURL)
 
 	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
 	defer cancel()
+
 	cmd := cj.spec.ScriptCmd(scriptCtx, cj.BasePath)
 	writer.AddTitle("Main Script")
 	err := cj.runScript(scriptCtx, cmd, writer)
@@ -194,10 +191,11 @@ func (cj *coreJob) RunMainScript(ctx context.Context, writer *report.Writer, gis
 
 // runs spec.AfterScript
 func (cj *coreJob) RunAfterScript(ctx context.Context, writer *report.Writer, gistID string) error {
-	gistURL := cj.getGistPublishedURL(gistID, cj.repo.Owner.Login)
+	gistURL := cj.client.Api.PublishedGistURL(gistID, cj.client.User)
 
 	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
 	defer cancel()
+
 	cmd := cj.spec.AfterScriptCmd(scriptCtx, cj.BasePath)
 	writer.AddTitle("After Script")
 	err := cj.runScript(scriptCtx, cmd, writer)
@@ -218,28 +216,6 @@ func (cj *coreJob) RunAfterScript(ctx context.Context, writer *report.Writer, gi
 }
 
 // ----------- helper functions ---------------
-// build report in markdown format
-func (cj *coreJob) buildReport() []byte {
-	var sb strings.Builder
-	sb.WriteString("## Script Results\n```\n")
-	sb.Write(cj.scriptOutput)
-	if len(cj.scriptOutput) == 0 {
-		sb.WriteString("\n")
-	}
-	sb.WriteString("```\n## After Script Results\n```\n")
-	sb.Write(cj.afterScriptOutput)
-	if len(cj.afterScriptOutput) == 0 {
-		sb.WriteString("\n")
-	}
-	sb.WriteString("```")
-	return []byte(sb.String())
-}
-
-// post commit status to gh client
-func (cj *coreJob) getGistPublishedURL(id, user string) string {
-	return fmt.Sprintf("https://gist.github.com/%s/%s", user, id)
-}
-
 func (cj *coreJob) postCommitStatus() error {
 	err := cj.client.UpdateCommitStatus(cj.repo, cj.commit)
 	if err != nil {

@@ -105,7 +105,7 @@ func TestUpdateStatus(t *testing.T) {
 
 func TestListen(t *testing.T) {
 	eventChan := make(chan Event, 10)
-	gh := NewClient(eventChan)
+	gh := NewClient(eventChan, "testuser")
 	log, err := logging.NewLogger(logging.NONE, "console")
 	assert.Ok(t, err)
 

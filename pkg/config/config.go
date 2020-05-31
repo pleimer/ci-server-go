@@ -6,7 +6,7 @@ import (
 )
 
 type Config struct {
-	Organization  string
+	User          string
 	Oauth         string
 	Proxy         string
 	ListenAddress string
@@ -14,13 +14,13 @@ type Config struct {
 
 func NewConfig() (*Config, error) {
 	c := &Config{
-		Organization: os.Getenv("ORGANIZATION"),
-		Oauth:        os.Getenv("OAUTH"),
-		Proxy:        os.Getenv("https_proxy"),
+		User:  os.Getenv("GITHUB_USER"),
+		Oauth: os.Getenv("OAUTH"),
+		Proxy: os.Getenv("https_proxy"),
 	}
 
-	if c.Organization == "" {
-		return nil, fmt.Errorf("organization not specified by ORGANIZATION environmental variable")
+	if c.User == "" {
+		return nil, fmt.Errorf("organization not specified by GITHUB_USER environmental variable")
 	}
 
 	if c.Oauth == "" {
