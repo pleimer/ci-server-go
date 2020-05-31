@@ -11,7 +11,7 @@ var (
 )
 
 // GistWriter implements io.Writer type for writing to
-// github gists. Gists last the lifetime of this object.
+// a single file in a github gists. Gists last the lifetime of this object.
 // That is, first calls to write will create a new gist,
 // and subsequent calls will update the existing gist
 // until this object is destroyed.
@@ -19,41 +19,52 @@ var (
 // This should be used in conjustion
 // with a buffered writer to avoid frequent API calls
 type GistWriter struct {
-	API     *API
-	desc    gistDesc
-	created bool
+	API        *API
+	serverGist serverGist
+	gist       Gist
+	filename   string
+	created    bool //if gist was created server side
 }
 
 //NewGistWriter GistWriter constructor
-func NewGistWriter(api *API) *GistWriter {
+func NewGistWriter(api *API, g Gist, filename string) *GistWriter {
 	return &GistWriter{
-		API: api,
+		API:      api,
+		gist:     g,
+		filename: filename,
 	}
 }
 
 // Write implements io.Writer
 func (gw *GistWriter) Write(p []byte) (int, error) {
+	gw.gist.WriteFile(gw.filename, string(p))
+	data, err := json.Marshal(gw.gist)
+
+	if err != nil {
+		return 0, err
+	}
+
 	if !gw.created {
-		resp, err := gw.API.PostGists(p)
+		resp, err := gw.API.PostGists(data)
 		if err != nil {
 			return 0, err
 		}
 
-		err = json.Unmarshal(resp, &gw.desc)
-		if gw.desc.ID == "" {
+		err = json.Unmarshal(resp, &gw.serverGist)
+		if gw.serverGist.ID == "" {
 			return 0, ErrInvalidResp
 		}
 		gw.created = true
 		return len(p), nil
 	}
 
-	_, err := gw.API.UpdateGist(p, gw.desc.ID)
+	_, err = gw.API.UpdateGist(data, gw.serverGist.ID)
 	if err != nil {
 		return 0, err
 	}
 	return len(p), nil
 }
 
-type gistDesc struct {
+type serverGist struct {
 	ID string `json:"id"`
 }
