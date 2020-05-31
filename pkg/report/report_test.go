@@ -8,7 +8,7 @@ import (
 )
 
 func TestReport(t *testing.T) {
-	exp := "\n## Title1\n```\ncodeblock\n```\n\n## Title2\nbodytext"
+	exp := "\n## Title1\n```\ncodeblock\n\n```\n\n## Title2\nbodytext\n"
 	t.Run("2 section build", func(t *testing.T) {
 		sb := &strings.Builder{}
 		rep := NewWriter(sb)

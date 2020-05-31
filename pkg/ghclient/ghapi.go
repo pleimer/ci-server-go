@@ -66,7 +66,7 @@ func (a *API) PostStatus(owner, repo, commitSha string, body []byte) error {
 
 // PostGists sends post request to status
 func (a *API) PostGists(body []byte) ([]byte, error) {
-	res, err := a.post(a.GistURL(), body)
+	res, err := a.post(a.NewGistURL(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +78,26 @@ func (a *API) PostGists(body []byte) ([]byte, error) {
 	}
 
 	cCode := 201
+	if res.StatusCode != cCode {
+		return nil, a.err.withMessage(fmt.Sprintf("expected status code %d, received %s", cCode, res.Status))
+	}
+	return info, nil
+}
+
+//UpdateGist updates gist with ID
+func (a *API) UpdateGist(body []byte, ID string) ([]byte, error) {
+	res, err := a.post(a.UpdateGistURL(ID), body)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	info, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, a.err.withMessage(fmt.Sprintf("failed reading server response: %s", err))
+	}
+
+	cCode := 200
 	if res.StatusCode != cCode {
 		return nil, a.err.withMessage(fmt.Sprintf("expected status code %d, received %s", cCode, res.Status))
 	}
@@ -141,6 +161,15 @@ func (a *API) post(URL string, body []byte) (*http.Response, error) {
 	return a.Client.Do(req)
 }
 
+func (a *API) patch(URL string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", URL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "token "+a.oauth)
+	return a.Client.Do(req)
+}
+
 // StatusURL generates url for querying status
 func (a *API) StatusURL(owner, repo, sha string) string {
 	return a.makeURL([]string{"repos", owner, repo, "statuses", sha})
@@ -154,8 +183,12 @@ func (a *API) BlobURL(owner, repo, fileSha string) string {
 	return a.makeURL([]string{"repos", owner, repo, "git", "blobs", fileSha})
 }
 
-func (a *API) GistURL() string {
+func (a *API) NewGistURL() string {
 	return a.makeURL([]string{"gists"})
+}
+
+func (a *API) UpdateGistURL(ID string) string {
+	return a.makeURL([]string{"gists", ID})
 }
 
 func (a *API) makeURL(items []string, params ...string) string {

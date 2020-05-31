@@ -22,10 +22,12 @@ type Writer struct {
 	blockOpened bool
 }
 
-// NewWriter create Writer with initialized buffer
-func NewWriter(w io.Writer) *Writer {
+// NewWriter create Writer with initialized buffer and arbitrary number of
+// writer targets
+func NewWriter(w ...io.Writer) *Writer {
+	mw := io.MultiWriter(w...)
 	return &Writer{
-		writer: bufio.NewWriterSize(w, 1000),
+		writer: bufio.NewWriterSize(mw, 1000),
 	}
 }
 
@@ -84,7 +86,7 @@ func (rw *Writer) Write(msg string) int {
 		return n
 	}
 
-	n, rw.err = rw.writer.WriteString(msg)
+	n, rw.err = rw.writer.WriteString(fmt.Sprintf("%s\n", msg))
 	return n
 }
 

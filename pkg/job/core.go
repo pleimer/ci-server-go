@@ -74,7 +74,7 @@ func (cj *coreJob) loadSpec() error {
 }
 
 //runs a script and writes buffered output to file and gist writer
-func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, title string) error {
+func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *report.Writer) error {
 	var err error
 
 	stdout, err := script.StdoutPipe()
@@ -90,22 +90,11 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, title string
 
 	//reader := bufio.NewReader(stdout)
 	scanner := bufio.NewScanner(stdout)
-	logPath := filepath.Join(cj.BasePath, fmt.Sprintf("%s.log", cj.commit.Sha))
 
-	f, err := os.Create(logPath)
-	if err != nil {
-		return err
+	if writer.Err() != nil {
+		return writer.Err()
 	}
-
-	defer f.Close()
-
-	//TODO: add new writer for gists here
-	bwFile := report.NewWriter(f)
-	bwFile.AddTitle(title)
-	if bwFile.Err() != nil {
-		return bwFile.Err()
-	}
-	bwFile.OpenBlock()
+	writer.OpenBlock()
 
 	scriptDone := make(chan struct{})
 	go func() {
@@ -117,45 +106,45 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, title string
 		break
 	default:
 		for scanner.Scan() {
-			bwFile.Write(scanner.Text())
+			writer.Write(scanner.Text())
 		}
 	}
 	err = scanner.Err()
 
 	if ctx.Err() != nil {
-		bwFile.Write(fmt.Sprintf("\nerror: %s", ctx.Err()))
-		bwFile.CloseBlock()
-		bwFile.Flush()
+		writer.Write(fmt.Sprintf("\nerror: %s", ctx.Err()))
+		writer.CloseBlock()
+		writer.Flush()
 		return ctx.Err()
 	}
 
 	if err != nil {
-		bwFile.Write(fmt.Sprintf("\nerror: %s", err))
-		bwFile.CloseBlock()
-		bwFile.Flush()
+		writer.Write(fmt.Sprintf("\nerror: %s", err))
+		writer.CloseBlock()
+		writer.Flush()
 		return err
 	}
 
-	bwFile.CloseBlock()
-	bwFile.Flush()
-	if bwFile.Err() != nil {
-		return bwFile.Err()
+	writer.CloseBlock()
+	writer.Flush()
+	if writer.Err() != nil {
+		return writer.Err()
 	}
 
 	return nil
 }
 
 // runs spec.Script
-func (cj *coreJob) RunMainScript(ctx context.Context) error {
+func (cj *coreJob) RunMainScript(ctx context.Context, writer *report.Writer) error {
 	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
 	cj.postCommitStatus()
 	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", "")
 
 	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
 	defer cancel()
-
 	cmd := cj.spec.ScriptCmd(scriptCtx, cj.BasePath)
-	err := cj.runScript(scriptCtx, cmd, "main script")
+	writer.AddTitle("Main Script")
+	err := cj.runScript(scriptCtx, cmd, writer)
 	if err != nil {
 		return err
 	}
@@ -163,27 +152,13 @@ func (cj *coreJob) RunMainScript(ctx context.Context) error {
 }
 
 // runs spec.AfterScript
-func (cj *coreJob) runAfterScript(ctx context.Context) error {
-	var err error
-
+func (cj *coreJob) RunAfterScript(ctx context.Context, writer *report.Writer) error {
 	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
 	defer cancel()
-
-	cj.afterScriptOutput, err = cj.spec.AfterScriptCmd(scriptCtx, cj.BasePath).Output()
-	if ctx.Err() != nil {
-		if ctx.Err() == context.Canceled {
-			cj.commit.SetStatus(ghclient.ERROR, "after_script canceled", "")
-		}
-		if ctx.Err() == context.DeadlineExceeded {
-			cj.commit.SetStatus(ghclient.FAILURE, "after_script timed out", "")
-		}
-		cj.afterScriptOutput = []byte(fmt.Sprintf("%s\nerror: %s\n", cj.afterScriptOutput, err))
-		return ctx.Err()
-	}
-
+	cmd := cj.spec.AfterScriptCmd(scriptCtx, cj.BasePath)
+	writer.AddTitle("After Script")
+	err := cj.runScript(scriptCtx, cmd, writer)
 	if err != nil {
-		cj.commit.SetStatus(ghclient.FAILURE, fmt.Sprintf("after_script failed: %s", err), "")
-		cj.afterScriptOutput = []byte(fmt.Sprintf("%s\nerror(%s) %s\n", cj.afterScriptOutput, err, err.(*exec.ExitError).Stderr))
 		return err
 	}
 	return nil

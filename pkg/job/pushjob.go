@@ -3,10 +3,13 @@ package job
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
 	"github.com/pleimer/ci-server-go/pkg/logging"
+	"github.com/pleimer/ci-server-go/pkg/report"
 )
 
 // PushJob contains logic for dealing with github push events
@@ -72,9 +75,18 @@ func (p *PushJob) Run(ctx context.Context) {
 		return
 	}
 
+	// initialize writers
+	logPath := filepath.Join(p.BasePath, fmt.Sprintf("%s.log", commit.Sha))
+	f, err := os.Open(logPath)
+	defer f.Close()
+
+	gw := ghclient.NewGistWriter(&p.client.Api)
+	writer := report.NewWriter(f, gw)
+
+	// run scripts
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("running main script")
-	err = cj.RunMainScript(ctx)
+	err = cj.RunMainScript(ctx, writer)
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("script failed")
@@ -90,7 +102,7 @@ func (p *PushJob) Run(ctx context.Context) {
 	// so it isn't too terrible
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("running after script")
-	err = cj.runAfterScript(context.Background())
+	err = cj.RunAfterScript(context.Background(), writer)
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("after_script failed")
