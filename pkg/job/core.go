@@ -101,9 +101,13 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 		script.Wait()
 	}()
 
+	ticker := time.NewTicker(60 * time.Second)
+
 	select {
 	case <-scriptDone:
 		break
+	case <-ticker.C:
+		writer.Flush()
 	default:
 		for scanner.Scan() {
 			writer.Write(scanner.Text())

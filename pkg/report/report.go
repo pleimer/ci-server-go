@@ -23,11 +23,11 @@ type Writer struct {
 }
 
 // NewWriter create Writer with initialized buffer and arbitrary number of
-// writer targets
+// writer targets. Initializes with 1MBi buffer
 func NewWriter(w ...io.Writer) *Writer {
 	mw := io.MultiWriter(w...)
 	return &Writer{
-		writer: bufio.NewWriterSize(mw, 1000),
+		writer: bufio.NewWriterSize(mw, 1024*1024),
 	}
 }
 
@@ -95,10 +95,6 @@ func (rw *Writer) Flush() int {
 	var n int
 	if rw.err != nil {
 		return n
-	}
-
-	if rw.blockOpened {
-		return rw.CloseBlock()
 	}
 
 	rw.err = rw.writer.Flush()
