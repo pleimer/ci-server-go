@@ -3,7 +3,6 @@ package ghclient
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 )
 
 var (
@@ -40,8 +39,6 @@ func NewGistWriter(api *API, g Gist, filename string) (*GistWriter, error) {
 	}
 
 	gw.gist.DeleteFile(filename)
-
-	fmt.Println(string(data))
 	resp, err := api.PostGists(data)
 	if err != nil {
 		return nil, err

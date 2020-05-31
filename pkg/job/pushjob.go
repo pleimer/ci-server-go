@@ -47,7 +47,6 @@ func (p *PushJob) Compare(other queue.Item) int {
 
 // Run ...
 func (p *PushJob) Run(ctx context.Context) {
-	p.Status = RUNNING
 	commit := p.event.Ref.GetHead()
 	cj := newCoreJob(p.client, p.event.Repo, *commit)
 	cj.BasePath = "/tmp"
@@ -57,12 +56,7 @@ func (p *PushJob) Run(ctx context.Context) {
 	err := cj.getTree()
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
-		p.Log.Error("failed to get resources")
-		// err = cj.postResults(p.user)
-		// if err != nil {
-		// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
-		// 	p.Log.Error("failed to post results")
-		// }
+		p.Log.Error("retrieving resources")
 		return
 	}
 
@@ -107,7 +101,10 @@ func (p *PushJob) Run(ctx context.Context) {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 		p.Log.Info("main script completed successfully")
 	}
-	p.handleContextError(err)
+	if err := cj.postCommitStatus(); err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err.Error()})
+		p.Log.Error("posting commit status")
+	}
 
 	// It is highly NOT recommended to create top level contexts in lower functions
 	// 'After script' is responsible for cleaning up resources, so it must run even when a cancel signal
@@ -115,7 +112,7 @@ func (p *PushJob) Run(ctx context.Context) {
 	// so it isn't too terrible
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("running after script")
-	err = cj.RunAfterScript(context.Background(), writer)
+	err = cj.RunAfterScript(context.Background(), writer, gw.GetServerGistID())
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("after_script failed")
@@ -123,25 +120,8 @@ func (p *PushJob) Run(ctx context.Context) {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 		p.Log.Info("after_script completed successfully")
 	}
-	p.handleContextError(err)
-
-	// err = cj.postResults(p.user)
-	// if err != nil {
-	// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
-	// 	p.Log.Info("failed to post results")
-	// } else {
-	// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
-	// 	repoName := cj.repo.Name
-	// 	p.Log.Info(fmt.Sprintf("posted '%s' status to '%s|%s|%s'", cj.commit.Status.State, repoName, p.event.RefName, commit.Sha))
-	// }
-	p.Status = COMPLETE
-}
-
-func (p *PushJob) handleContextError(err error) {
-	switch err {
-	case context.DeadlineExceeded:
-		p.Status = TIMEDOUT
-	case context.Canceled:
-		p.Status = CANCELED
+	if err := cj.postCommitStatus(); err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err.Error()})
+		p.Log.Error("posting commit status")
 	}
 }

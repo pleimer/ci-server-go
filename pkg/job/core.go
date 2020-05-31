@@ -145,70 +145,57 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 
 // runs spec.Script
 func (cj *coreJob) RunMainScript(ctx context.Context, writer *report.Writer, gistID string) error {
-	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
+	gistURL := cj.getGistPublishedURL(gistID, cj.repo.Owner.Login)
+	cj.commit.SetStatus(ghclient.PENDING, "pending", gistURL)
 	cj.postCommitStatus()
-	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", "")
+	cj.commit.SetStatus(ghclient.SUCCESS, "main script successful", gistURL)
 
 	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
 	defer cancel()
 	cmd := cj.spec.ScriptCmd(scriptCtx, cj.BasePath)
 	writer.AddTitle("Main Script")
 	err := cj.runScript(scriptCtx, cmd, writer)
+
 	if err != nil {
+		switch err {
+		case context.Canceled:
+			cj.commit.SetStatus(ghclient.ERROR, "main script canceled", gistURL)
+		case context.DeadlineExceeded:
+			cj.commit.SetStatus(ghclient.FAILURE, "main script timed out", gistURL)
+		case ghclient.ErrInvalidResp:
+			cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("error logging: %s", err), gistURL)
+		default:
+			cj.commit.SetStatus(ghclient.FAILURE, "main script failed", gistURL)
+		}
 		return err
 	}
 	return nil
 }
 
 // runs spec.AfterScript
-func (cj *coreJob) RunAfterScript(ctx context.Context, writer *report.Writer) error {
+func (cj *coreJob) RunAfterScript(ctx context.Context, writer *report.Writer, gistID string) error {
+	gistURL := cj.getGistPublishedURL(gistID, cj.repo.Owner.Login)
+
 	scriptCtx, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cj.spec.Global.Timeout))
 	defer cancel()
 	cmd := cj.spec.AfterScriptCmd(scriptCtx, cj.BasePath)
 	writer.AddTitle("After Script")
 	err := cj.runScript(scriptCtx, cmd, writer)
 	if err != nil {
+		switch err {
+		case context.Canceled:
+			cj.commit.SetStatus(ghclient.ERROR, "after_script canceled", gistURL)
+		case context.DeadlineExceeded:
+			cj.commit.SetStatus(ghclient.ERROR, "after_script timed out", gistURL)
+		case ghclient.ErrInvalidResp:
+			cj.commit.SetStatus(ghclient.ERROR, fmt.Sprintf("error logging: %s", err), gistURL)
+		default:
+			cj.commit.SetStatus(ghclient.ERROR, "after_script failed", gistURL)
+		}
 		return err
 	}
 	return nil
 }
-
-// post commit status and gist report to github client
-// func (cj *coreJob) postResults(user string) error {
-// 	//post gist
-// 	report := string(cj.buildReport())
-// 	gist := ghclient.NewGist()
-// 	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", cj.repo.Name, cj.commit.Sha)
-// 	gist.AddFile(fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha), report)
-// 	gJSON, err := json.Marshal(gist)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	res, err := cj.client.Api.PostGists(gJSON)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// get gist target url
-// 	resMap := make(map[string]interface{})
-// 	err = json.Unmarshal(res, &resMap)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if _, ok := resMap["id"]; !ok {
-// 		return fmt.Errorf("failed to retrieve gist ID from github api response")
-// 	}
-
-// 	targetURL := cj.getGistPublishedURL(resMap["id"].(string), user)
-// 	cj.commit.Status.TargetURL = targetURL
-// 	err = cj.postCommitStatus()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
 
 // ----------- helper functions ---------------
 // build report in markdown format
