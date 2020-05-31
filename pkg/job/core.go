@@ -101,7 +101,7 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 		scriptDone <- struct{}{}
 	}()
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	go func() {
 		for {
 			select {
@@ -110,7 +110,6 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 				return
 			case <-ticker.C:
 				writer.Flush()
-				fmt.Println("Flush writer")
 			}
 		}
 	}()
@@ -145,7 +144,7 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 }
 
 // runs spec.Script
-func (cj *coreJob) RunMainScript(ctx context.Context, writer *report.Writer) error {
+func (cj *coreJob) RunMainScript(ctx context.Context, writer *report.Writer, gistID string) error {
 	cj.commit.SetStatus(ghclient.PENDING, "pending", "")
 	cj.postCommitStatus()
 	cj.commit.SetStatus(ghclient.SUCCESS, "all jobs passed", "")

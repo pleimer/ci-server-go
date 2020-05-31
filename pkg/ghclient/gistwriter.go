@@ -3,6 +3,7 @@ package ghclient
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 var (
@@ -20,19 +21,37 @@ var (
 // with a buffered writer to avoid frequent API calls
 type GistWriter struct {
 	API        *API
-	serverGist serverGist
+	serverGist *serverGist
 	gist       Gist
 	filename   string
-	created    bool //if gist was created server side
 }
 
 //NewGistWriter GistWriter constructor
-func NewGistWriter(api *API, g Gist, filename string) *GistWriter {
-	return &GistWriter{
+func NewGistWriter(api *API, g Gist, filename string) (*GistWriter, error) {
+	gw := &GistWriter{
 		API:      api,
 		gist:     g,
 		filename: filename,
 	}
+	gw.gist.WriteFile(filename, "pending...")
+	data, err := json.Marshal(gw.gist)
+	if err != nil {
+		return nil, err
+	}
+
+	gw.gist.DeleteFile(filename)
+
+	fmt.Println(string(data))
+	resp, err := api.PostGists(data)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(resp, &gw.serverGist)
+	if gw.serverGist.ID == "" {
+		return nil, ErrInvalidResp
+	}
+	return gw, nil
 }
 
 // Write implements io.Writer
@@ -44,25 +63,19 @@ func (gw *GistWriter) Write(p []byte) (int, error) {
 		return 0, err
 	}
 
-	if !gw.created {
-		resp, err := gw.API.PostGists(data)
-		if err != nil {
-			return 0, err
-		}
-
-		err = json.Unmarshal(resp, &gw.serverGist)
-		if gw.serverGist.ID == "" {
-			return 0, ErrInvalidResp
-		}
-		gw.created = true
-		return len(p), nil
-	}
-
 	_, err = gw.API.UpdateGist(data, gw.serverGist.ID)
 	if err != nil {
 		return 0, err
 	}
 	return len(p), nil
+}
+
+//GetServerGistID returns ID of gist on github server
+func (gw *GistWriter) GetServerGistID() string {
+	if gw.serverGist == nil {
+		return ""
+	}
+	return gw.serverGist.ID
 }
 
 type serverGist struct {

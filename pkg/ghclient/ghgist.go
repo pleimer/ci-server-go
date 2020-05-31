@@ -22,6 +22,11 @@ func NewGist() Gist {
 	}
 }
 
+//DeleteFile delete file from gist
+func (g *Gist) DeleteFile(name string) {
+	delete(g.Files, name)
+}
+
 // WriteFile appends content to gist file. Create new
 // file if it does not already exist
 func (g *Gist) WriteFile(name, content string) {

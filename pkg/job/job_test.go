@@ -112,7 +112,7 @@ func TestCancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
 
 	t.Run("script timeout", func(t *testing.T) {
-		err := cjUT.RunMainScript(ctx, writer)
+		err := cjUT.RunMainScript(ctx, writer, "newgist")
 		assert.Equals(t, context.DeadlineExceeded, err)
 	})
 	cancel()
@@ -127,7 +127,7 @@ func TestCancel(t *testing.T) {
 	ctx, cancel = context.WithTimeout(context.Background(), time.Millisecond*10)
 	t.Run("script cancel", func(t *testing.T) {
 		cancel()
-		err := cjUT.RunMainScript(ctx, writer)
+		err := cjUT.RunMainScript(ctx, writer, "newgist")
 		assert.Equals(t, context.Canceled, err)
 	})
 }

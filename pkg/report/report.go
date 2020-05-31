@@ -104,6 +104,9 @@ func (rw *Writer) Write(msg string) int {
 
 //Flush close out report
 func (rw *Writer) Flush() int {
+	rw.lock.Lock()
+	defer rw.lock.Unlock()
+
 	var n int
 	if rw.err != nil {
 		return n

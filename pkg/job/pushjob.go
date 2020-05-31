@@ -88,13 +88,18 @@ func (p *PushJob) Run(ctx context.Context) {
 	gist := ghclient.NewGist()
 	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", cj.repo.Name, cj.commit.Sha)
 
-	gw := ghclient.NewGistWriter(&p.client.Api, gist, fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha))
+	gw, err := ghclient.NewGistWriter(&p.client.Api, gist, fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha))
+	if err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		p.Log.Error("creating gist writer")
+		return
+	}
 	writer := report.NewWriter(f, gw)
 
 	// run scripts
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("running main script")
-	err = cj.RunMainScript(ctx, writer)
+	err = cj.RunMainScript(ctx, writer, gw.GetServerGistID())
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Info("script failed")
