@@ -3,7 +3,6 @@ package job
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -99,20 +98,27 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 	scriptDone := make(chan struct{})
 	go func() {
 		script.Wait()
+		scriptDone <- struct{}{}
 	}()
 
-	ticker := time.NewTicker(60 * time.Second)
-
-	select {
-	case <-scriptDone:
-		break
-	case <-ticker.C:
-		writer.Flush()
-	default:
-		for scanner.Scan() {
-			writer.Write(scanner.Text())
+	ticker := time.NewTicker(5 * time.Second)
+	go func() {
+		for {
+			select {
+			case <-scriptDone:
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				writer.Flush()
+				fmt.Println("Flush writer")
+			}
 		}
+	}()
+
+	for scanner.Scan() {
+		writer.Write(scanner.Text())
 	}
+
 	err = scanner.Err()
 
 	if ctx.Err() != nil {
@@ -169,41 +175,41 @@ func (cj *coreJob) RunAfterScript(ctx context.Context, writer *report.Writer) er
 }
 
 // post commit status and gist report to github client
-func (cj *coreJob) postResults(user string) error {
-	//post gist
-	report := string(cj.buildReport())
-	gist := ghclient.NewGist()
-	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", cj.repo.Name, cj.commit.Sha)
-	gist.AddFile(fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha), report)
-	gJSON, err := json.Marshal(gist)
-	if err != nil {
-		return err
-	}
+// func (cj *coreJob) postResults(user string) error {
+// 	//post gist
+// 	report := string(cj.buildReport())
+// 	gist := ghclient.NewGist()
+// 	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", cj.repo.Name, cj.commit.Sha)
+// 	gist.AddFile(fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha), report)
+// 	gJSON, err := json.Marshal(gist)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	res, err := cj.client.Api.PostGists(gJSON)
-	if err != nil {
-		return err
-	}
+// 	res, err := cj.client.Api.PostGists(gJSON)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	// get gist target url
-	resMap := make(map[string]interface{})
-	err = json.Unmarshal(res, &resMap)
-	if err != nil {
-		return err
-	}
+// 	// get gist target url
+// 	resMap := make(map[string]interface{})
+// 	err = json.Unmarshal(res, &resMap)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if _, ok := resMap["id"]; !ok {
-		return fmt.Errorf("failed to retrieve gist ID from github api response")
-	}
+// 	if _, ok := resMap["id"]; !ok {
+// 		return fmt.Errorf("failed to retrieve gist ID from github api response")
+// 	}
 
-	targetURL := cj.getGistPublishedURL(resMap["id"].(string), user)
-	cj.commit.Status.TargetURL = targetURL
-	err = cj.postCommitStatus()
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// 	targetURL := cj.getGistPublishedURL(resMap["id"].(string), user)
+// 	cj.commit.Status.TargetURL = targetURL
+// 	err = cj.postCommitStatus()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // ----------- helper functions ---------------
 // build report in markdown format

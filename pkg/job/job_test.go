@@ -144,7 +144,7 @@ func formatGistOutput(repoName, commitSha, scriptOutput, afterScriptOutput strin
 	cGist := ghclient.Gist{
 		Description: fmt.Sprintf("CI Results for repository '%s' commit '%s'", repoName, commitSha),
 		Public:      true,
-		Files: map[string]ghclient.File{
+		Files: map[string]*ghclient.File{
 			fmt.Sprintf("%s_%s.md", repoName, commitSha): {
 				Content: sb.String(),
 			},

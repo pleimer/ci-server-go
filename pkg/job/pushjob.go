@@ -58,11 +58,11 @@ func (p *PushJob) Run(ctx context.Context) {
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Error("failed to get resources")
-		err = cj.postResults(p.user)
-		if err != nil {
-			p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
-			p.Log.Error("failed to post results")
-		}
+		// err = cj.postResults(p.user)
+		// if err != nil {
+		// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		// 	p.Log.Error("failed to post results")
+		// }
 		return
 	}
 
@@ -85,7 +85,10 @@ func (p *PushJob) Run(ctx context.Context) {
 	}
 	defer f.Close()
 
-	gw := ghclient.NewGistWriter(&p.client.Api)
+	gist := ghclient.NewGist()
+	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", cj.repo.Name, cj.commit.Sha)
+
+	gw := ghclient.NewGistWriter(&p.client.Api, gist, fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha))
 	writer := report.NewWriter(f, gw)
 
 	// run scripts
@@ -117,15 +120,15 @@ func (p *PushJob) Run(ctx context.Context) {
 	}
 	p.handleContextError(err)
 
-	err = cj.postResults(p.user)
-	if err != nil {
-		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
-		p.Log.Info("failed to post results")
-	} else {
-		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
-		repoName := cj.repo.Name
-		p.Log.Info(fmt.Sprintf("posted '%s' status to '%s|%s|%s'", cj.commit.Status.State, repoName, p.event.RefName, commit.Sha))
-	}
+	// err = cj.postResults(p.user)
+	// if err != nil {
+	// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+	// 	p.Log.Info("failed to post results")
+	// } else {
+	// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	// 	repoName := cj.repo.Name
+	// 	p.Log.Info(fmt.Sprintf("posted '%s' status to '%s|%s|%s'", cj.commit.Status.State, repoName, p.event.RefName, commit.Sha))
+	// }
 	p.Status = COMPLETE
 }
 

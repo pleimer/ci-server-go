@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 )
 
 var (
@@ -20,6 +21,7 @@ type Writer struct {
 	writer      *bufio.Writer
 	err         error
 	blockOpened bool
+	lock        sync.Mutex
 }
 
 // NewWriter create Writer with initialized buffer and arbitrary number of
@@ -39,6 +41,8 @@ func (rw *Writer) Err() error {
 // OpenBlock opens up a code block for writing
 // CloseBlock() must be called to end the block
 func (rw *Writer) OpenBlock() int {
+	rw.lock.Lock()
+	defer rw.lock.Unlock()
 	var n int
 	if rw.err != nil {
 		return n
@@ -50,6 +54,8 @@ func (rw *Writer) OpenBlock() int {
 
 //CloseBlock close code block
 func (rw *Writer) CloseBlock() int {
+	rw.lock.Lock()
+	defer rw.lock.Unlock()
 	var n int
 	if rw.err != nil {
 		return n
@@ -66,6 +72,9 @@ func (rw *Writer) CloseBlock() int {
 
 // AddTitle write level 2 title
 func (rw *Writer) AddTitle(msg string) int {
+	rw.lock.Lock()
+	defer rw.lock.Unlock()
+
 	var n int
 	if rw.err != nil {
 		return n
@@ -81,6 +90,9 @@ func (rw *Writer) AddTitle(msg string) int {
 }
 
 func (rw *Writer) Write(msg string) int {
+	rw.lock.Lock()
+	defer rw.lock.Unlock()
+
 	var n int
 	if rw.err != nil {
 		return n
