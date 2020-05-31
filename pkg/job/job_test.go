@@ -101,6 +101,20 @@ func TestPushJob(t *testing.T) {
 // 	})
 // }
 
+func TestFailedScript(t *testing.T) {
+	spec, github, repo, _, commit, _, _ := genTestEnvironment([]string{"asdfasdf"}, []string{""})
+	var sb strings.Builder
+	writer := report.NewWriter(&sb)
+
+	cjUT := newCoreJob(github, *repo, commit)
+	cjUT.spec = spec
+
+	err := cjUT.RunMainScript(context.Background(), writer, "")
+	t.Log(sb.String())
+	t.Log(err.Error())
+
+}
+
 func TestCancel(t *testing.T) {
 	spec, github, repo, _, commit, _, _ := genTestEnvironment([]string{"echo starting", "sleep 5", "echo ending"}, []string{"sleep 5"})
 	var sb strings.Builder

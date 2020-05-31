@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
@@ -75,6 +76,7 @@ func (cj *coreJob) loadSpec() error {
 //runs a script and writes buffered output to file and gist writer
 func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *report.Writer) error {
 	var err error
+	var scriptErr error
 
 	stdout, err := script.StdoutPipe()
 	if err != nil {
@@ -96,13 +98,21 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 	writer.OpenBlock()
 
 	scriptDone := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		script.Wait()
+		defer wg.Done()
+		scriptErr = script.Wait()
+		if scriptErr != nil {
+			fmt.Println("Script err " + scriptErr.Error())
+		}
 		scriptDone <- struct{}{}
 	}()
 
 	ticker := time.NewTicker(30 * time.Second)
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			select {
 			case <-scriptDone:
@@ -118,7 +128,7 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 		writer.Write(scanner.Text())
 	}
 
-	err = scanner.Err()
+	wg.Wait()
 
 	if ctx.Err() != nil {
 		writer.Write(fmt.Sprintf("\nerror: %s", ctx.Err()))
@@ -126,6 +136,16 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 		writer.Flush()
 		return ctx.Err()
 	}
+
+	if scriptErr != nil {
+		fmt.Println("There was an error in the script")
+		writer.Write(fmt.Sprintf("\nerror: %s", scriptErr))
+		writer.CloseBlock()
+		writer.Flush()
+		return scriptErr
+	}
+
+	err = scanner.Err()
 
 	if err != nil {
 		writer.Write(fmt.Sprintf("\nerror: %s", err))
