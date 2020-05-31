@@ -139,7 +139,7 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 
 	if scriptErr != nil {
 		fmt.Println("There was an error in the script")
-		writer.Write(fmt.Sprintf("\nerror: %s", scriptErr))
+		writer.Write(fmt.Sprintf("\n[ci-server] script error: %s", scriptErr))
 		writer.CloseBlock()
 		writer.Flush()
 		return scriptErr
