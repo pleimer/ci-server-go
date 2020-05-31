@@ -76,8 +76,13 @@ func (p *PushJob) Run(ctx context.Context) {
 	}
 
 	// initialize writers
-	logPath := filepath.Join(p.BasePath, fmt.Sprintf("%s.log", commit.Sha))
-	f, err := os.Open(logPath)
+	logPath := filepath.Join(cj.BasePath, fmt.Sprintf("%s.log", commit.Sha))
+	f, err := os.Create(logPath)
+	if err != nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
+		p.Log.Error("opening log path")
+		return
+	}
 	defer f.Close()
 
 	gw := ghclient.NewGistWriter(&p.client.Api)

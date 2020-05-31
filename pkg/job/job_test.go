@@ -27,30 +27,30 @@ var (
 )
 
 // TestPushJob simulate push event coming from github, test running the job
-// func TestPushJob(t *testing.T) {
-// 	t.Run("regular run", func(t *testing.T) {
-// 		_, github, repo, ref, commit, log, _ := genTestEnvironment([]string{"echo $OCP_PROJECT"}, []string{"echo Done"})
-// 		path := "/tmp"
-// 		deleteFiles(path)
+func TestPushJob(t *testing.T) {
+	t.Run("regular run", func(t *testing.T) {
+		_, github, repo, ref, _, log, _ := genTestEnvironment([]string{"echo $OCP_PROJECT"}, []string{"echo Done"})
+		path := "/tmp"
+		deleteFiles(path)
 
-// 		ev := ghclient.Push{
-// 			Repo:    *repo,
-// 			RefName: "refs/head/master",
-// 			Ref:     *ref,
-// 		}
+		ev := ghclient.Push{
+			Repo:    *repo,
+			RefName: "refs/head/master",
+			Ref:     *ref,
+		}
 
-// 		pj := PushJob{
-// 			event:    &ev,
-// 			client:   github,
-// 			BasePath: path,
-// 			Log:      log,
-// 		}
+		pj := PushJob{
+			event:    &ev,
+			client:   github,
+			BasePath: path,
+			Log:      log,
+		}
 
-// 		pj.Run(context.Background())
-// 		expGistStr := formatGistOutput(repo.Name, commit.Sha, "t0", "Done")
-// 		assert.Equals(t, expGistStr, gistString)
-// 	})
-// }
+		pj.Run(context.Background())
+		// expGistStr := formatGistOutput(repo.Name, commit.Sha, "t0", "Done")
+		// assert.Equals(t, expGistStr, gistString)
+	})
+}
 
 // 	t.Run("script fail", func(t *testing.T) {
 // 		_, github, repo, ref, commit, log, _ := genTestEnvironment([]string{"./ci.sh"}, []string{"echo Done"})
@@ -293,6 +293,18 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 		return &http.Response{
 			StatusCode: 201,
 			Status:     "201 Created",
+			Body:       ioutil.NopCloser(strings.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
+	}
+
+	serverResponses[gh.Api.UpdateGistURL("newgist")] = func(req *http.Request) (*http.Response, error) {
+		body := `{"url":"` + gh.Api.NewGistURL() + `/testgist", "id":"newgist"}`
+		res, _ := ioutil.ReadAll(req.Body)
+		gistString = string(res)
+		return &http.Response{
+			StatusCode: 200,
+			Status:     "200 Ok",
 			Body:       ioutil.NopCloser(strings.NewReader(body)),
 			Header:     make(http.Header),
 		}, nil
