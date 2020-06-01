@@ -8,7 +8,7 @@ fi
 smee() {
     while :
     do
-        nohup smee -u https://smee.io/jq2Z16Hst5Xe8RCH --path /webhook & > /dev/null
+        nohup smee -u "${SMEE_URL}" --path /webhook & > /dev/null
         sleep 3600
         pkill node 
         echo Killed smee
