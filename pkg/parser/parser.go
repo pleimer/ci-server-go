@@ -53,7 +53,7 @@ func (s *Spec) AfterScriptCmd(ctx context.Context, basePath string) *exec.Cmd {
 func (s *Spec) genEnv(ctx context.Context, comList []string) *exec.Cmd {
 	comList = append([]string{"set -e"}, comList...)
 	cmdString := strings.Join(comList, ";")
-	cmd := exec.CommandContext(ctx, fmt.Sprintf("(%s)", cmdString))
+	cmd := exec.CommandContext(ctx, "bash", "-ci", cmdString)
 	var newEnv []string
 	for key, val := range s.Global.Env {
 		switch v := val.(type) {
