@@ -162,7 +162,7 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 func (cj *coreJob) RunMainScript(ctx context.Context, writer *report.Writer, gistID string) error {
 	gistURL := cj.client.Api.PublishedGistURL(gistID, cj.client.User)
 
-	cj.commit.SetStatus(ghclient.PENDING, "pending", gistURL)
+	cj.commit.SetStatus(ghclient.PENDING, "running main script", gistURL)
 	cj.postCommitStatus()
 	cj.commit.SetStatus(ghclient.SUCCESS, "main script successful", gistURL)
 
