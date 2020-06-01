@@ -70,13 +70,13 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 		if err != nil {
 			return pushEventError(fmt.Sprintf("failed creating commit object from JSON: %s", err))
 		}
-		cSlice = append(cSlice, *c)
+		cSlice = append([]Commit{*c}, cSlice...)
 	}
 
 	// create ordered list of parents
 	for i, c := range cSlice {
 		if i < len(cSlice)-1 {
-			c.setChild(&cSlice[i+1])
+			c.setParent(&cSlice[i+1])
 		}
 	}
 
