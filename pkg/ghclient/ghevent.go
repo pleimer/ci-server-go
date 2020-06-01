@@ -45,8 +45,8 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 		return err
 	}
 
-	if _, ok := client.repositories[repo.Name]; !ok {
-		client.repositories[repo.Name] = repo
+	if _, ok := client.Repositories[repo.Name]; !ok {
+		client.Repositories[repo.Name] = repo
 	}
 
 	var cSliceJSON []json.RawMessage
@@ -88,11 +88,11 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 		return pushEventError("no reference found in event message")
 	}
 	p.RefName = refName
-	client.repositories[repo.Name].registerCommits(head, refName)
+	client.Repositories[repo.Name].registerCommits(head, refName)
 	client.Cache.WriteCommits(head)
 
 	// p.Repo = *repo
-	p.Repo = *client.repositories[repo.Name]
+	p.Repo = *client.Repositories[repo.Name]
 	if p.Repo.GetReference(refName) == nil {
 		return pushEventError("failed to retrieve reference from repository")
 	}

@@ -17,7 +17,7 @@ type Client struct {
 
 	Api          API
 	Cache        Cache
-	repositories map[string]*Repository
+	Repositories map[string]*Repository
 
 	err GithubClientError
 }
@@ -27,7 +27,7 @@ func NewClient(eventChan chan Event, user string) Client {
 	return Client{
 		Api:          NewAPI(),
 		User:         user,
-		repositories: make(map[string]*Repository),
+		Repositories: make(map[string]*Repository),
 		Cache:        NewCache(),
 		EventChan:    eventChan,
 		err: GithubClientError{

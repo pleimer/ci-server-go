@@ -48,6 +48,9 @@ func (p *PushJob) Compare(other queue.Item) int {
 // Run ...
 func (p *PushJob) Run(ctx context.Context) {
 	commit := p.event.Ref.GetHead()
+	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	p.Log.Debug(fmt.Sprintf("running push job for %s", commit.Sha))
+
 	if commit == nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": "commit does not exist"})
 		p.Log.Error("retrieving resources")
