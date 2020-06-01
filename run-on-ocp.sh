@@ -11,6 +11,6 @@ if [[ -z "${GITHUB_OAUTH}" ]]; then
     exit -1
 fi
 
-sed "s/<oauth_token>/$(cat ~/accessgit)/g" deploy-on-k8s.yml > /tmp/ci-ocp.yml
+sed "s/<oauth_token>/${GITHUB_OAUTH}/g" deploy-on-k8s.yml > /tmp/ci-ocp.yml
 sed "s/<github_user>/${GITHUB_USER}/g" /tmp/ci-ocp.yml > /tmp/ci-ocp.yml
 oc create -f /tmp/ci-ocp.yml

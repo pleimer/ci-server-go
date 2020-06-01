@@ -105,7 +105,7 @@ func (cj *coreJob) runScript(ctx context.Context, script *exec.Cmd, writer *repo
 		scriptDone <- struct{}{}
 	}()
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
