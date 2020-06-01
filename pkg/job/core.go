@@ -212,6 +212,7 @@ func (cj *coreJob) RunAfterScript(ctx context.Context, writer *report.Writer, gi
 		}
 		return err
 	}
+	cj.commit.SetStatus(ghclient.SUCCESS, "all scripts passed", gistURL)
 	return nil
 }
 

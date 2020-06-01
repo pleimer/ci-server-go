@@ -48,6 +48,11 @@ func (p *PushJob) Compare(other queue.Item) int {
 // Run ...
 func (p *PushJob) Run(ctx context.Context) {
 	commit := p.event.Ref.GetHead()
+	if commit == nil {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": "commit does not exist"})
+		p.Log.Error("retrieving resources")
+		return
+	}
 	cj := newCoreJob(p.client, p.event.Repo, *commit)
 	cj.BasePath = "/tmp"
 
