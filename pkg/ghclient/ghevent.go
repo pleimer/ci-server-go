@@ -76,7 +76,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	// create ordered list of parents
 	for i, c := range cSlice {
 		if i < len(cSlice)-1 {
-			c.setParent(&cSlice[i+1])
+			c.setChild(&cSlice[i+1])
 		}
 	}
 
