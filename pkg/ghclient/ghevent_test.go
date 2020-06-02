@@ -57,9 +57,9 @@ func TestHandle(t *testing.T) {
 
 		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
 		refName := webhook["ref"].(string)
-		ref := gh.repositories[repoName].refs[`"`+refName+`"`]
+		ref := gh.Repositories[repoName].refs[`"`+refName+`"`]
 
-		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (gh.Repositories[repoName] != nil), "failed to create repository")
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
 
@@ -68,7 +68,7 @@ func TestHandle(t *testing.T) {
 			assert.Ok(t, err)
 		}
 
-		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (gh.Repositories[repoName] != nil), "failed to create repository")
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
 	})
@@ -87,9 +87,9 @@ func TestHandle(t *testing.T) {
 
 		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
 		refName := webhook["ref"].(string)
-		ref := gh.repositories[repoName].refs[`"`+refName+`"`]
+		ref := gh.Repositories[repoName].refs[`"`+refName+`"`]
 
-		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (gh.Repositories[repoName] != nil), "failed to create repository")
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
 
@@ -103,9 +103,9 @@ func TestHandle(t *testing.T) {
 
 		repoName = webhook["repository"].(map[string]interface{})["name"].(string)
 		refName = webhook["ref"].(string)
-		ref = gh.repositories[repoName].refs[`"`+refName+`"`]
+		ref = gh.Repositories[repoName].refs[`"`+refName+`"`]
 
-		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (gh.Repositories[repoName] != nil), "failed to create repository")
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
 	})
@@ -132,9 +132,9 @@ func TestHandle(t *testing.T) {
 
 		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
 		refName := webhook["ref"].(string)
-		ref := gh.repositories[repoName].refs[`"`+refName+`"`]
+		ref := gh.Repositories[repoName].refs[`"`+refName+`"`]
 
-		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (gh.Repositories[repoName] != nil), "failed to create repository")
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
 
@@ -173,9 +173,9 @@ func TestHandle(t *testing.T) {
 
 		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
 		refName := webhook["ref"].(string)
-		ref := gh.repositories[repoName].refs[`"`+refName+`"`]
+		ref := gh.Repositories[repoName].refs[`"`+refName+`"`]
 
-		assert.Assert(t, (gh.repositories[repoName] != nil), "failed to create repository")
+		assert.Assert(t, (gh.Repositories[repoName] != nil), "failed to create repository")
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
 	})

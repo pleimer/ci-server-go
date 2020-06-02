@@ -65,10 +65,10 @@ func (cj *coreJob) LoadSpec() error {
 		return err
 	}
 	cj.spec, err = parser.NewSpecFromYAML(f)
-	cj.spec.SetMetaVar("__commit__", cj.commit.Sha)
 	if err != nil {
 		return err
 	}
+	cj.spec.SetMetaVar("__commit__", cj.commit.Sha)
 	return nil
 }
 
