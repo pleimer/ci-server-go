@@ -16,9 +16,9 @@ import (
 func Run(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	log, err := logging.NewLogger(logging.DEBUG, "console")
+	log, err := logging.NewLogger(logging.DEBUG, "ci-server-go.log")
 	if err != nil {
-		log.Error(err.Error())
+		fmt.Printf("error creating logger: %s\n", err)
 		return
 	}
 	log.Timestamp = true
