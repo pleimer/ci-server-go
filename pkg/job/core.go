@@ -60,10 +60,12 @@ func (cj *coreJob) LoadSpec() error {
 	cj.BasePath = filepath.Join(cj.BasePath, tree.Path)
 
 	f, err := os.Open(filepath.Join(cj.BasePath, "ci.yml"))
-	defer f.Close()
 	if err != nil {
 		return err
 	}
+
+	defer f.Close()
+
 	cj.spec, err = parser.NewSpecFromYAML(f)
 	if err != nil {
 		return err
