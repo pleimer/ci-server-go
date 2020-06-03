@@ -52,7 +52,7 @@ func (s *Spec) AfterScriptCmd(ctx context.Context, basePath string) *exec.Cmd {
 
 func (s *Spec) genEnv(ctx context.Context, comList []string) *exec.Cmd {
 	cmdString := strings.Join(comList, ";")
-	cmdString = fmt.Sprintf("'%s'", cmdString)
+	//cmdString = fmt.Sprintf("'%s'", cmdString)
 	fmt.Printf("command: %s\n", cmdString)
 	cmd := exec.CommandContext(ctx, "bash", "-ce", cmdString)
 	var newEnv []string
