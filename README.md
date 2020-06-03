@@ -1,5 +1,5 @@
 #  ci-server-go
-This is a small ci runner that reacts to webhooks happening in a repository and runs different types of jobs depending on the webhook type. The primary job involves running commands in a `ci.yml` file in the top level directory of a reporitory. For example, on a github push webhook, the runner will download the repository, run the `ci.yml` specification while continually updating a github gist with the output and finally post a pass or fail status to the commit that triggered the job. 
+This is a small ci runner that reacts to github webhooks and runs different types of jobs depending on the webhook type. The primary job involves running commands in a `ci.yml` file in the top level directory of a repository. For example, on a push webhook, the runner will download the repository, run the `ci.yml` specification while continually updating a github gist with the output and finally post a pass or fail status to the commit that triggered the job. 
 
 Another type of job might run on a comment webhook. If the comment on a PR contains a specific keyword, the job can re-run the sequence above. 
 
