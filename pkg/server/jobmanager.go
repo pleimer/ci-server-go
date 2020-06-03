@@ -76,25 +76,24 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 	go func() {
 		defer wg.Done()
 		for {
-			j, ok := <-jb.jobQueue
-			if !ok {
-				jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
-				jb.log.Debug("job queue disposed")
+			select {
+			case <-ctx.Done():
 				return
-			}
-			if runningJob, ok := jb.runningJobs.Get(j.GetRepoName(), j.GetRefName()); ok {
-				runningJob.cancel()
-				jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
-				jb.log.Info(fmt.Sprintf("conflicting job for repository %s, ref %s - cancelled running job", j.GetRepoName(), j.GetRefName()))
-			}
-			jCtx, jCancel := context.WithCancel(ctx)
-			jb.runningJobs.Set(j.GetRepoName(), j.GetRefName(), &jobContext{
-				job:    j,
-				cancel: jCancel,
-			})
-			workChan <- func() {
-				j.Run(jCtx)
-				jb.runningJobs.Remove(j.GetRepoName(), j.GetRefName())
+			case j, ok := <-jb.jobQueue:
+				if !ok {
+					jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
+					jb.log.Debug("job queue disposed")
+					return
+				}
+				jCtx, jCancel := context.WithCancel(ctx)
+				jb.runningJobs.Set(j.GetRepoName(), j.GetRefName(), &jobContext{
+					job:    j,
+					cancel: jCancel,
+				})
+				workChan <- func() {
+					j.Run(jCtx)
+					jb.runningJobs.Remove(j.GetRepoName(), j.GetRefName())
+				}
 			}
 		}
 	}()
@@ -102,6 +101,11 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 	for {
 		select {
 		case j := <-jobChan:
+			if runningJob, ok := jb.runningJobs.Get(j.GetRepoName(), j.GetRefName()); ok {
+				runningJob.cancel()
+				jb.log.Metadata(map[string]interface{}{"process": "JobManager"})
+				jb.log.Info(fmt.Sprintf("conflicting job for repository %s, ref %s - cancelled running job", j.GetRepoName(), j.GetRefName()))
+			}
 			jb.jobQueue <- j
 		case <-ctx.Done():
 			close(jb.jobQueue)
