@@ -13,7 +13,7 @@ go get ./...
 go build cmd/server.go
 ```
 
-# Configuring
+# Configuration
 Configurations are passed in with environmental variables
 
 *var* | *default* | *description*
@@ -24,6 +24,11 @@ ADDRESS | localhost:3000 | address on which to listen for webhooks
 NUM_WORKERS | 4 | max number of jobs that can execute in parallel
 
 For results to be posted to github, the configured user must have access to repositories the server is intended to run on.
+
+# Run
+```bash
+./server
+```
 
 # ci.yml
 
