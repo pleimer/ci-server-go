@@ -1,7 +1,8 @@
 #  ci-server-go
-This is a small ci runner that listens for webhooks from github repositories, executes `ci.yml` in the top level directory of the repostiroy and posts the results to whatever commit the incoming webhook corresponds to. Sometimes, a webhook may envolve several commits, in which case the most recent one is executed.
+This is a small ci runner that reacts to webhooks happening in a repository and runs different types of jobs depending on the webhook type. The primary job involves running commands in a `ci.yml` file in the top level directory of a reporitory. For example, on a github push webhook, the runner will download the repository, run the `ci.yml` specification while continually updating a github gist with the output and finally post a pass or fail status to the commit that triggered the job. 
 
-Stdout of commands run in `ci.yml` are written to both a logfile on the host machine and a gist file on the user the server runs with. The gist file can be accessed by viewing the commit status. 
+Another type of job might run on a comment webhook. If the comment on a PR contains a specific keyword, the job can re-run the sequence above. 
+
 
 # Build
 Requires go v1.11 or higher
@@ -24,5 +25,17 @@ NUM_WORKERS | 4 | max number of jobs that can execute in parallel
 
 For results to be posted to github, the configured user must have access to repositories the server is intended to run on.
 
+# ci.yml
 
+## magic variables
+Magic variables contain information about the job environment that commands in `ci.yml` can access. For example, a ci script may want some information about the commit that triggered its run. In this case, the sha of that commit can be accessed with the `__commit__ ` magic variable. Magic variables must be stored to an environmental variable to be accessed by the main script sections in `ci.yml`. Therefor, to print the sha of the commit, a `ci.yml` might look like the following:
 
+```yaml
+
+gloabl:
+    timeout: 300
+    env:
+        COMMIT_SHA: __commit__
+script:
+    - echo "$COMMIT_SHA"
+```
