@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,7 +53,7 @@ func (cj *coreJob) GetTree() error {
 	return nil
 }
 
-func (cj *coreJob) LoadSpec() error {
+func (cj *coreJob) LoadSpec(refName string) error {
 	tree, err := cj.client.GetTree(cj.commit.Sha, cj.repo)
 	if err != nil {
 		return err
@@ -71,6 +72,12 @@ func (cj *coreJob) LoadSpec() error {
 		return err
 	}
 	cj.spec.SetMetaVar("__commit__", cj.commit.Sha)
+	cj.spec.SetMetaVar("__ref__", refName)
+
+	refComponents := strings.Split(refName, "/")
+	branchName := refComponents[len(refComponents)-1]
+	cj.spec.SetMetaVar("__branch__", branchName)
+
 	return nil
 }
 
