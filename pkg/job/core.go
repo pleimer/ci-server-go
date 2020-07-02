@@ -72,6 +72,7 @@ func (cj *coreJob) LoadSpec(refName string) error {
 		return err
 	}
 	cj.spec.SetMetaVar("__commit__", cj.commit.Sha)
+	refName = strings.ReplaceAll(refName, "\"", "")
 	cj.spec.SetMetaVar("__ref__", refName)
 
 	refComponents := strings.Split(refName, "/")
