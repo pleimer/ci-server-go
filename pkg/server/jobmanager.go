@@ -85,6 +85,7 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 					jb.log.Debug("job queue disposed")
 					return
 				}
+
 				jCtx, jCancel := context.WithCancel(ctx)
 				jb.runningJobs.Set(j.GetRepoName(), j.GetRefName(), &jobContext{
 					job:    j,

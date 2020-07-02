@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/golang-collections/go-datastructures/queue"
+	"github.com/pleimer/ci-server-go/pkg/ghclient"
 	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
@@ -18,11 +19,13 @@ type CommentJob struct {
 	// not match any of the commits contained within the branch, will trigger a core job sequence
 	// on the commit at the head of the branch
 
+	Log   *logging.Logger
+	event *ghclient.Comment
 }
 
 //SetLogger implements Job interface
-func (cj *CommentJob) SetLogger(logger *logging.Logger) {
-	return
+func (cj *CommentJob) SetLogger(l *logging.Logger) {
+	cj.Log = l
 }
 
 //Run implements Job interface
@@ -30,7 +33,7 @@ func (cj *CommentJob) Run(ctx context.Context) {
 	return
 }
 
-//Compare implements Job interface
+//Compare implements queue.Item
 func (cj *CommentJob) Compare(queue.Item) int {
 	return 0
 }

@@ -24,6 +24,14 @@ func EventFactory(incoming string) (Event, error) {
 	return nil, fmt.Errorf("unknown event type '%s'", incoming)
 }
 
+// Comment implements Event interface. Represents a github comment webhook
+type Comment struct {
+}
+
+func (c *Comment) Handle(client *Client, commentJSON []byte) error {
+	return nil
+}
+
 // Push implements github Event interface
 type Push struct {
 	Ref     Reference
