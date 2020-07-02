@@ -70,7 +70,7 @@ func (p *PushJob) Run(ctx context.Context) {
 
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info("loading test specifications")
-	err = cj.LoadSpec()
+	err = cj.LoadSpec(p.GetRefName())
 	if err != nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": err})
 		p.Log.Error("failed to load spec")
