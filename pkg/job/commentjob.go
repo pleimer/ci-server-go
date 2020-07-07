@@ -10,7 +10,7 @@ import (
 
 // CommentJob works on a comment webhook event.
 type CommentJob struct {
-	//This job runs a regular core job when it descovers the _trigger keyword in a comment message.
+	// This job runs a regular core job when it descovers the _trigger keyword in a comment message.
 	// Any trailing character sequence after the _trigger keyword will be treated as a commit sha
 	// on which to run the new core job sequence. This sha must be contained in the current branch
 	// of the PR request on which the comment is made.
@@ -40,7 +40,7 @@ func (cj *CommentJob) Compare(queue.Item) int {
 
 //GetRefName implements Job interface
 func (cj *CommentJob) GetRefName() string {
-	return ""
+	return cj.event.RefName
 }
 
 //GetRepoName implements Job interface
