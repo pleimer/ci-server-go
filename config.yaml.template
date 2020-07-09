@@ -1,0 +1,12 @@
+github:
+    user:   # username with admin privledges to monitored repositories
+    oauth:  # oauth token for above user
+
+listener: 
+    address: # listen for webhooks here
+
+runner:
+    numWorkers: # number of jobs that can run in parallel
+    authorizedUsers: # users athorized to run CI jobs
+        - user1
+        - user2
