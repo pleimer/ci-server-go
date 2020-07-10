@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -16,7 +17,7 @@ import (
 func Run(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	log, err := logging.NewLogger(logging.DEBUG, "ci-server-go.log")
+	log, err := logging.NewLogger(logging.DEBUG, "console")
 	if err != nil {
 		fmt.Printf("error creating logger: %s\n", err)
 		return
@@ -25,19 +26,28 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
 	defer log.Destroy()
 
-	config, err := config.NewConfig()
+	config := config.NewConfig()
+	file, err := os.Open("ci-server-config.yaml")
 	if err != nil {
-		log.Error(err.Error())
+		log.Metadata(map[string]interface{}{"process": "server", "error": err})
+		log.Error("failed reading config file")
+		return
+	}
+	defer file.Close()
+
+	err = config.Parse(file)
+	if err != nil {
+		log.Metadata(map[string]interface{}{"process": "server", "error": err})
+		log.Error("failed parsing config")
 		return
 	}
 
 	evChan := make(chan ghclient.Event)
 
-	gh := ghclient.NewClient(evChan, config.User)
-	err = gh.Api.Authenticate(strings.NewReader(config.Oauth))
+	gh := ghclient.NewClient(evChan, config.GetUser())
+	err = gh.Api.Authenticate(strings.NewReader(config.GetOauth()))
 	if err != nil {
 		log.Error(err.Error())
 		return
@@ -45,12 +55,12 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	log.Info("successfully authenticated with oauth token")
 
 	wg.Add(1)
-	server := gh.Listen(wg, config.Address, log)
-	log.Info(fmt.Sprintf("listening on %s for webhooks", config.Address))
+	server := gh.Listen(wg, config.GetAddress(), log)
+	log.Info(fmt.Sprintf("listening on %s for webhooks", config.GetAddress()))
 
 	jobChan := make(chan job.Job)
 
-	jobManager := NewJobManager(config.Workers, log)
+	jobManager := NewJobManager(config.GetNumWorkers(), log)
 	wg.Add(1)
 	go jobManager.Run(ctx, wg, jobChan)
 
