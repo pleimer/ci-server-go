@@ -13,7 +13,8 @@ type Event interface {
 }
 
 var events map[string]Event = map[string]Event{
-	"push": &Push{},
+	"push":                        &Push{},
+	"pull_request_review_comment": &Comment{},
 }
 
 // EventFactory create github event based on string name
@@ -22,6 +23,89 @@ func EventFactory(incoming string) (Event, error) {
 		return e, nil
 	}
 	return nil, fmt.Errorf("unknown event type '%s'", incoming)
+}
+
+// Comment implements Event interface. Represents a github comment webhook
+type Comment struct {
+	Ref  Reference
+	Repo Repository
+
+	Action   string
+	RefName  string
+	Body     string
+	CommitID string
+}
+
+// Handle parses the contents of a github comment
+func (c *Comment) Handle(client *Client, commentJSON []byte) error {
+	// There are four types of comment webhooks:
+	// 1. commit_comment
+	// 2. pull_request_review
+	// 3. pull_request_review_comment
+	// 4. issue_comment
+
+	// This event handles only 3
+
+	var ok bool
+
+	eventMap := make(map[string]interface{})
+	err := json.Unmarshal(commentJSON, &eventMap)
+	if err != nil {
+		return commentEventError(fmt.Sprintf("failed parsing comment event json: %s", err))
+	}
+
+	c.Action, ok = eventMap["action"].(string)
+	if !ok {
+		return commentEventError("failed parsing comment event json: event data did not contain 'action' attribute")
+	}
+
+	commentMap, ok := eventMap["comment"].(map[string]interface{})
+	if !ok {
+		return commentEventError("failed retrieving comment data. Data did not exist or was wrong type")
+	}
+
+	c.Body, ok = commentMap["body"].(string)
+	if !ok {
+		return commentEventError("failed retrieving comment body. Body did not exist or was wrong type")
+	}
+
+	prMap, ok := eventMap["pull_request"].(map[string]interface{})
+	if !ok {
+		return commentEventError("failed to retrieve pull request data from comment json")
+	}
+
+	head, ok := prMap["head"].(map[string]interface{})
+	if !ok {
+		return commentEventError("failed to retrieve head commit data for comment")
+	}
+
+	c.CommitID, ok = head["sha"].(string)
+	if !ok {
+		return commentEventError("failed retrieving associated commit ID. Item did not exist or was wrong type")
+	}
+
+	c.RefName, ok = head["ref"].(string)
+	if !ok {
+		return commentEventError("failed retrieving reference name. Reference name did not exist or was wrong type")
+	}
+
+	repoName, ok := head["repo"].(map[string]interface{})["name"].(string)
+	if !ok {
+		return commentEventError("failed retrieving repository name. Repository name did not exist or was wrong type")
+	}
+
+	var repo *Repository
+	if repo, ok = client.Repositories[repoName]; !ok {
+		return commentEventError("could not find repository in client registry - it must be loaded before comment")
+	}
+	c.Repo = *repo
+
+	ref := repo.GetReference(c.RefName)
+	if ref == nil {
+		return commentEventError(fmt.Sprintf("could not find reference %s in %s repository", c.RefName, repoName))
+	}
+	c.Ref = *ref
+	return nil
 }
 
 // Push implements github Event interface
@@ -104,6 +188,13 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 func pushEventError(msg string) error {
 	return &GithubClientError{
 		module: "Push",
+		err:    msg,
+	}
+}
+
+func commentEventError(msg string) error {
+	return &GithubClientError{
+		module: "Comment",
 		err:    msg,
 	}
 }
