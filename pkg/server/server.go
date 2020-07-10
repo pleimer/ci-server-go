@@ -17,7 +17,7 @@ import (
 func Run(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	log, err := logging.NewLogger(logging.DEBUG, "console")
+	log, err := logging.NewLogger(logging.DEBUG, "ci-server-go.log")
 	if err != nil {
 		fmt.Printf("error creating logger: %s\n", err)
 		return

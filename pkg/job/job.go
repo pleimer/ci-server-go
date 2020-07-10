@@ -38,6 +38,12 @@ type Job interface {
 // Factory generate jobs based on event type
 func Factory(event ghclient.Event, client *ghclient.Client, log *logging.Logger) (Job, error) {
 	switch e := event.(type) {
+	case *ghclient.Comment:
+		return &CommentJob{
+			event:  e,
+			client: client,
+			Log:    log,
+		}, nil
 	case *ghclient.Push:
 		return &PushJob{
 			event:  e,

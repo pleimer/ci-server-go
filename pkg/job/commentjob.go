@@ -2,6 +2,8 @@ package job
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
@@ -19,8 +21,9 @@ type CommentJob struct {
 	// not match any of the commits contained within the branch, will trigger a core job sequence
 	// on the commit at the head of the branch
 
-	Log   *logging.Logger
-	event *ghclient.Comment
+	Log    *logging.Logger
+	client *ghclient.Client
+	event  *ghclient.Comment
 }
 
 //SetLogger implements Job interface
@@ -29,8 +32,23 @@ func (cj *CommentJob) SetLogger(l *logging.Logger) {
 }
 
 //Run implements Job interface
-func (cj *CommentJob) Run(ctx context.Context) {
-	return
+func (cj *CommentJob) Run(ctx context.Context, authUsers []string) {
+	commit := cj.event.Ref.GetHead()
+
+	cj.Log.Metadata(map[string]interface{}{"process": "CommentJob"})
+	cj.Log.Info(fmt.Sprintf("received comment: %s", cj.event.Body))
+
+	//parse message body
+	tokens := strings.Split(cj.event.Body, " ")
+	if sliceContainsString(tokens, "/runtest") {
+		if sliceContainsString(authUsers, cj.event.User) {
+			cj.Log.Metadata(map[string]interface{}{"process": "CommentJob"})
+			cj.Log.Info(fmt.Sprintf("authorized user '%s' requested '/retest' - proceeding with core job", cj.event.User))
+			RunCoreJob(ctx, cj.client, cj.event.Repo, cj.GetRefName(), *commit, cj.Log)
+		}
+		cj.Log.Metadata(map[string]interface{}{"process": "CommentJob"})
+		cj.Log.Info(fmt.Sprintf("user '%s' not authorized to run jobs, ignoring", cj.event.User))
+	}
 }
 
 //Compare implements queue.Item

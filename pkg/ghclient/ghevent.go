@@ -3,6 +3,7 @@ package ghclient
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -47,7 +48,7 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	// 3. pull_request_review_comment
 	// 4. issue_comment
 
-	// This event handles only 4
+	// This event handles only #4
 
 	var ok bool
 
@@ -79,7 +80,7 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	}
 
 	// second level attributes
-	pullRequest, ok := issue["pull_request"].(map[string]string)
+	pullRequest, ok := issue["pull_request"].(map[string]interface{})
 	if !ok {
 		return commentEventError("failed parsing pull request data from event message")
 	}
@@ -100,7 +101,7 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	}
 
 	// third level attributes
-	prURL, ok := pullRequest["url"]
+	prURL, ok := pullRequest["url"].(string)
 	if !ok {
 		return commentEventError("failed parsing pull request url from event message")
 	}
@@ -142,6 +143,10 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	if !ok {
 		return fmt.Errorf("failed to find reference data from pull request data")
 	}
+
+	//TODO: query this from commit URL instead of this hack
+	c.RefName = strings.Join([]string{"refs", "heads", c.RefName}, "/")
+	c.RefName = "\"" + c.RefName + "\""
 
 	if ref := client.Repositories[repoName].GetReference(c.RefName); ref == nil {
 		return fmt.Errorf("could not find '%s' reference in repository '%s'", c.RefName, repoName)

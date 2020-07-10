@@ -53,13 +53,14 @@ func (p *PushJob) Run(ctx context.Context, authUsers []string) {
 		return
 	}
 
-	if sliceContainsString(authUsers, p.event.User) {
-		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
-		p.Log.Info(fmt.Sprintf("authorized user '%s' received - proceeding with core job", p.event.User))
-		RunCoreJob(ctx, p.client, p.event.Repo, p.GetRefName(), *commit, p.Log)
-		return
-	}
+	//TODO - make automatic running of job configureable
+	// if sliceContainsString(authUsers, p.event.User) {
+	// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	// 	p.Log.Info(fmt.Sprintf("authorized user '%s' received - proceeding with core job", p.event.User))
+	// 	RunCoreJob(ctx, p.client, p.event.Repo, p.GetRefName(), *commit, p.Log)
+	// 	return
+	// }
 
-	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
-	p.Log.Info(fmt.Sprintf("user '%s' not authorized to run jobs - ignoring", p.event.User))
+	// p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	// p.Log.Info(fmt.Sprintf("user '%s' not authorized to run jobs - ignoring", p.event.User))
 }

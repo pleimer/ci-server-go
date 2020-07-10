@@ -2,6 +2,8 @@ package ghclient
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -26,6 +28,30 @@ func NewRepositoryFromJSON(repoJSON []byte) (*Repository, error) {
 	}
 	repo.refs = make(map[string]*Reference)
 	return repo, nil
+}
+
+//NewRepositoryFromMap create new repository from map
+func NewRepositoryFromMap(m map[string]interface{}) (*Repository, error) {
+	rt := reflect.TypeOf(Repository{})
+	for i := 0; i < rt.NumField(); i++ {
+		field := rt.Field(i)
+		key := field.Tag.Get("json")
+		fmt.Println(key)
+
+		if val, ok := m[key]; ok {
+			if vt := reflect.ValueOf(val); vt.Kind() != field.Type.Kind() {
+				return nil, fmt.Errorf("attribute '%s' is wrong type - expected '%s' but got '%s'", key, field.Type.Kind().String(), vt.Kind().String())
+			}
+			continue
+		}
+		return nil, fmt.Errorf("missing value: %s", key)
+	}
+
+	repo := Repository{
+		Name: m["name"].(string),
+		Fork: m["fork"].(bool),
+	}
+	return &repo, nil
 }
 
 // GetReference retrieve git reference by ID
