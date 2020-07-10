@@ -34,6 +34,7 @@ type Comment struct {
 	RefName  string
 	Body     string
 	CommitID string
+	User     string
 }
 
 // Handle parses the contents of a github comment
@@ -57,6 +58,16 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	c.Action, ok = eventMap["action"].(string)
 	if !ok {
 		return commentEventError("failed parsing comment event json: event data did not contain 'action' attribute")
+	}
+
+	sender, ok := eventMap["sender"].(map[string]interface{})
+	if !ok {
+		return commentEventError("failed parsing comment event json: event data did not contain 'sender' attribute")
+	}
+
+	c.User, ok = sender["login"].(string)
+	if !ok {
+		return commentEventError("failed parsing comment event json: could not find user data")
 	}
 
 	commentMap, ok := eventMap["comment"].(map[string]interface{})
@@ -96,7 +107,7 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 
 	var repo *Repository
 	if repo, ok = client.Repositories[repoName]; !ok {
-		return commentEventError("could not find repository in client registry - it must be loaded before comment")
+		return commentEventError(fmt.Sprintf("could not find '%s' repository in client registry - it must be loaded before comment", repoName))
 	}
 	c.Repo = *repo
 

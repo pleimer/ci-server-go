@@ -63,7 +63,7 @@ func stringValidatorFactory() validator {
 func stringSliceValidatorFactory() validator {
 	return func(input interface{}) error {
 		if _, ok := input.([]interface{}); !ok {
-			return fmt.Errorf("expected type list, got '%T'", input)
+			return fmt.Errorf("expected list, got '%T'", input)
 		}
 		for _, item := range input.([]interface{}) {
 			if _, ok := item.(string); !ok {

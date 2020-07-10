@@ -2,6 +2,7 @@ package ghclient
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"testing"
 
 	"github.com/pleimer/ci-server-go/pkg/assert"
@@ -33,7 +34,24 @@ func getWebhook() map[string]interface{} {
 	}
 }
 
-func TestHandle(t *testing.T) {
+func TestCommentHandle(t *testing.T) {
+	cData, err := ioutil.ReadFile("payloads/comment.json")
+	assert.Ok(t, err)
+
+	gh := NewClient(nil, "testuser")
+	repo := &Repository{}
+	gh.Repositories = make(map[string]*Repository)
+	gh.Repositories["Hello-World"] = repo
+	repo.refs = make(map[string]*Reference)
+	repo.refs["changes"] = &Reference{}
+
+	commentEvent := &Comment{}
+
+	err = commentEvent.Handle(&gh, cData)
+	assert.Ok(t, err)
+}
+
+func TestPushHandle(t *testing.T) {
 	t.Run("null event", func(t *testing.T) {
 		gh := NewClient(nil, "testuser")
 

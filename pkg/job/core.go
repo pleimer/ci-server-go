@@ -12,9 +12,94 @@ import (
 	"time"
 
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
+	"github.com/pleimer/ci-server-go/pkg/logging"
 	"github.com/pleimer/ci-server-go/pkg/parser"
 	"github.com/pleimer/ci-server-go/pkg/report"
 )
+
+// RunCoreJob executes the main sequence of steps that a CI job contains.
+func RunCoreJob(ctx context.Context, client *ghclient.Client, repo ghclient.Repository, refName string, commit ghclient.Commit, log *logging.Logger) {
+	// This function downloads the git tree, loads in the ci.yml, creates writers
+	// to log test output to both a file and github gist, and runs the script and
+	// after_script sections of ci.yml
+
+	cj := newCoreJob(client, repo, commit)
+	cj.BasePath = "/tmp"
+
+	log.Metadata(map[string]interface{}{"process": "Core"})
+	log.Info("downloading git tree")
+	err := cj.GetTree()
+	if err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err})
+		log.Error("retrieving resources")
+		return
+	}
+
+	log.Metadata(map[string]interface{}{"process": "Core"})
+	log.Info("loading test specifications")
+	err = cj.LoadSpec(refName)
+	if err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err})
+		log.Error("failed to load spec")
+		return
+	}
+
+	// initialize writers
+	logPath := filepath.Join(cj.BasePath, fmt.Sprintf("%s.log", commit.Sha))
+	f, err := os.Create(logPath)
+	if err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err})
+		log.Error("opening log path")
+		return
+	}
+	defer f.Close()
+
+	gist := ghclient.NewGist()
+	gist.Description = fmt.Sprintf("CI Results for repository '%s' commit '%s'", cj.repo.Name, cj.commit.Sha)
+
+	gw, err := ghclient.NewGistWriter(&client.Api, gist, fmt.Sprintf("%s_%s.md", cj.repo.Name, cj.commit.Sha))
+	if err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err})
+		log.Error("creating gist writer")
+		return
+	}
+	writer := report.NewWriter(f, gw)
+
+	// run scripts
+	log.Metadata(map[string]interface{}{"process": "Core"})
+	log.Info("running main script")
+	err = cj.RunMainScript(ctx, writer, gw.GetServerGistID())
+	if err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err})
+		log.Info("script failed")
+	} else {
+		log.Metadata(map[string]interface{}{"process": "Core"})
+		log.Info("main script completed successfully")
+	}
+	if err := cj.postCommitStatus(); err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err.Error()})
+		log.Error("posting commit status")
+	}
+
+	// It is highly NOT recommended to create top level contexts in lower functions
+	// 'After script' is responsible for cleaning up resources, so it must run even when a cancel signal
+	// has been sent by the main server goroutine. This still garauntees an exit after timeout
+	// so it isn't too terrible
+	log.Metadata(map[string]interface{}{"process": "Core"})
+	log.Info("running after script")
+	err = cj.RunAfterScript(context.Background(), writer, gw.GetServerGistID())
+	if err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err})
+		log.Info("after_script failed")
+	} else {
+		log.Metadata(map[string]interface{}{"process": "Core"})
+		log.Info("after_script completed successfully")
+	}
+	if err := cj.postCommitStatus(); err != nil {
+		log.Metadata(map[string]interface{}{"process": "Core", "error": err.Error()})
+		log.Error("posting commit status")
+	}
+}
 
 // coreJob contains processes for the stages of running a script in a repository, generating and posting reports
 // getResources() must be run before both runScript() and runAfterScript()
