@@ -130,6 +130,7 @@ func (a *API) GetBlob(owner, repo, sha string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	cCode := 200
 	if res.StatusCode != cCode {
@@ -141,6 +142,16 @@ func (a *API) GetBlob(owner, repo, sha string) ([]byte, error) {
 		return nil, a.err.withMessage(fmt.Sprintf("failed reading server response: %s", err))
 	}
 	return info, nil
+}
+
+// GetURL generic function for querying a preconcieved URL
+func (a *API) GetURL(url string) ([]byte, error) {
+	res, err := a.get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	return ioutil.ReadAll(res.Body)
 }
 
 func (a *API) get(URL string) (*http.Response, error) {

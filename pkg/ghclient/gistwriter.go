@@ -16,7 +16,7 @@ var (
 // and subsequent calls will update the existing gist
 // until this object is destroyed.
 //
-// This should be used in conjustion
+// This should be used in conjuction
 // with a buffered writer to avoid frequent API calls
 type GistWriter struct {
 	API        *API
