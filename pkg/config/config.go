@@ -36,7 +36,11 @@ func (c *Config) GetNumWorkers() int {
 }
 
 func (c *Config) GetAuthorizedUsers() []string {
-	return c.sections["runner"].Options["authorizedUsers"].([]string)
+	users := []string{}
+	for _, user := range c.sections["runner"].Options["authorizedUsers"].([]interface{}) {
+		users = append(users, user.(string))
+	}
+	return users
 }
 
 /*******************************************************************/
@@ -63,7 +67,7 @@ func stringValidatorFactory() validator {
 func stringSliceValidatorFactory() validator {
 	return func(input interface{}) error {
 		if _, ok := input.([]interface{}); !ok {
-			return fmt.Errorf("expected list, got '%T'", input)
+			return fmt.Errorf("expected '[]string', got '%T'", input)
 		}
 		for _, item := range input.([]interface{}) {
 			if _, ok := item.(string); !ok {
@@ -112,7 +116,7 @@ func getConfigMetadata() map[string][]Parameter {
 		},
 		"runner": {
 			{"numWorkers", 4, false, []validator{intValidatorFactory()}},
-			{"authorizedUsers", nil, false, []validator{stringSliceValidatorFactory()}},
+			{"authorizedUsers", nil, true, []validator{stringSliceValidatorFactory()}},
 		},
 	}
 }

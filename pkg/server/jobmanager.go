@@ -61,7 +61,7 @@ func NewJobManager(numWorkers int, log *logging.Logger) *JobManager {
 }
 
 // Run main job manager process
-func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-chan job.Job) {
+func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-chan job.Job, authUsers []string) {
 	defer wg.Done()
 
 	workChan := make(chan func())
@@ -92,7 +92,7 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 					cancel: jCancel,
 				})
 				workChan <- func() {
-					j.Run(jCtx)
+					j.Run(jCtx, authUsers)
 					jb.runningJobs.Remove(j.GetRepoName(), j.GetRefName())
 				}
 			}

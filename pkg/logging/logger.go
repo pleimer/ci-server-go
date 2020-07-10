@@ -21,7 +21,7 @@ const (
 )
 
 func (l LogLevel) String() string {
-	return [...]string{"DEBUG", "INFO", "WARN", "ERROR"}[l]
+	return [...]string{"DEBUG", "INFO", "WARN", "\033[0;31mERROR\033[0m"}[l]
 }
 
 type writeFn func(string) error
@@ -165,7 +165,7 @@ func (l *Logger) Warn(message string) error {
 // Error level error
 func (l *Logger) Error(message string) error {
 	if l.Level <= ERROR {
-		return l.writeRecord(ERROR, message)
+		return l.writeRecord(ERROR, fmt.Sprintf("\033[0;31m%s\033[0m", message))
 	}
 	return nil
 }

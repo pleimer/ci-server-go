@@ -28,7 +28,7 @@ func (js Status) String() string {
 type Job interface {
 	SetLogger(*logging.Logger)
 
-	Run(context.Context)
+	Run(context.Context, []string)
 	Compare(queue.Item) int
 
 	GetRefName() string
@@ -46,4 +46,14 @@ func Factory(event ghclient.Event, client *ghclient.Client, log *logging.Logger)
 		}, nil
 	}
 	return nil, fmt.Errorf("failed creating job: could not determine github event type")
+}
+
+// --------------------------- helper functions ----------------------------------------
+func sliceContainsString(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }

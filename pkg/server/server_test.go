@@ -28,7 +28,7 @@ func (tj *TestJob) GetRepoName() string {
 	return tj.Repo
 }
 
-func (tj *TestJob) Run(ctx context.Context) {
+func (tj *TestJob) Run(ctx context.Context, authUsers []string) {
 	tj.Status = job.RUNNING
 	<-ctx.Done()
 	if ctx.Err() == context.Canceled {
@@ -60,7 +60,7 @@ func TestJobManager(t *testing.T) {
 		defer cancel()
 
 		wg.Add(1)
-		go jmUT.Run(ctx, &wg, jobChan)
+		go jmUT.Run(ctx, &wg, jobChan, nil)
 
 		original := &TestJob{
 			Ref:  "refs/head/master",
@@ -86,7 +86,7 @@ func TestJobManager(t *testing.T) {
 		defer cancel()
 
 		wg.Add(1)
-		go jmUT.Run(ctx, &wg, jobChan)
+		go jmUT.Run(ctx, &wg, jobChan, nil)
 
 		a := &TestJob{
 			Ref:  "refs/head/master",

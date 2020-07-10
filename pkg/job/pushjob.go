@@ -15,7 +15,6 @@ type PushJob struct {
 	client            *ghclient.Client
 	scriptOutput      []byte
 	afterScriptOutput []byte
-	user              string
 
 	BasePath string
 	Log      *logging.Logger
@@ -43,10 +42,10 @@ func (p *PushJob) Compare(other queue.Item) int {
 }
 
 // Run ...
-func (p *PushJob) Run(ctx context.Context) {
+func (p *PushJob) Run(ctx context.Context, authUsers []string) {
 	commit := p.event.Ref.GetHead()
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
-	p.Log.Debug(fmt.Sprintf("running push job for %s", commit.Sha))
+	p.Log.Info(fmt.Sprintf("running push job for %s", commit.Sha))
 
 	if commit == nil {
 		p.Log.Metadata(map[string]interface{}{"process": "PushJob", "error": "commit does not exist"})
@@ -54,5 +53,13 @@ func (p *PushJob) Run(ctx context.Context) {
 		return
 	}
 
-	RunCoreJob(ctx, p.client, p.event.Repo, p.GetRefName(), *commit, p.Log)
+	if sliceContainsString(authUsers, p.event.User) {
+		p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+		p.Log.Info(fmt.Sprintf("authorized user '%s' received - proceeding with core job", p.event.User))
+		RunCoreJob(ctx, p.client, p.event.Repo, p.GetRefName(), *commit, p.Log)
+		return
+	}
+
+	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	p.Log.Info(fmt.Sprintf("user '%s' not authorized to run jobs - ignoring", p.event.User))
 }

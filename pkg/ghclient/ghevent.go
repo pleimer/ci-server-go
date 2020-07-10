@@ -3,6 +3,8 @@ package ghclient
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 // add pull request and comment
@@ -13,8 +15,8 @@ type Event interface {
 }
 
 var events map[string]Event = map[string]Event{
-	"push":                        &Push{},
-	"pull_request_review_comment": &Comment{},
+	"push":          &Push{},
+	"issue_comment": &Comment{},
 }
 
 // EventFactory create github event based on string name
@@ -45,7 +47,7 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	// 3. pull_request_review_comment
 	// 4. issue_comment
 
-	// This event handles only 3
+	// This event handles only 4
 
 	var ok bool
 
@@ -55,67 +57,98 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 		return commentEventError(fmt.Sprintf("failed parsing comment event json: %s", err))
 	}
 
+	// first level attributes
 	c.Action, ok = eventMap["action"].(string)
 	if !ok {
 		return commentEventError("failed parsing comment event json: event data did not contain 'action' attribute")
 	}
 
-	sender, ok := eventMap["sender"].(map[string]interface{})
+	issue, ok := eventMap["issue"].(map[string]interface{})
 	if !ok {
-		return commentEventError("failed parsing comment event json: event data did not contain 'sender' attribute")
+		return commentEventError("failed parsing comment event json: event data did not contain 'issue' attribute")
 	}
 
-	c.User, ok = sender["login"].(string)
+	comment, ok := eventMap["comment"].(map[string]interface{})
 	if !ok {
-		return commentEventError("failed parsing comment event json: could not find user data")
+		return commentEventError("failed parsing comment event json: event data did not contain 'comment' attribute")
 	}
 
-	commentMap, ok := eventMap["comment"].(map[string]interface{})
+	repository, ok := eventMap["repository"].(map[string]interface{})
 	if !ok {
-		return commentEventError("failed retrieving comment data. Data did not exist or was wrong type")
+		return commentEventError("failed parsing comment event json: event data did not contain 'repository' attribute")
 	}
 
-	c.Body, ok = commentMap["body"].(string)
+	// second level attributes
+	pullRequest, ok := issue["pull_request"].(map[string]string)
 	if !ok {
-		return commentEventError("failed retrieving comment body. Body did not exist or was wrong type")
+		return commentEventError("failed parsing pull request data from event message")
 	}
 
-	prMap, ok := eventMap["pull_request"].(map[string]interface{})
+	user, ok := comment["user"].(map[string]interface{})
 	if !ok {
-		return commentEventError("failed to retrieve pull request data from comment json")
+		return commentEventError("failed parsing user data from event message")
 	}
 
-	head, ok := prMap["head"].(map[string]interface{})
+	c.Body, ok = comment["body"].(string)
 	if !ok {
-		return commentEventError("failed to retrieve head commit data for comment")
+		return commentEventError("failed parsing comment body from event message")
+	}
+
+	repoName, ok := repository["name"].(string)
+	if !ok {
+		return commentEventError("failed parsing repository name from event message")
+	}
+
+	// third level attributes
+	prURL, ok := pullRequest["url"]
+	if !ok {
+		return commentEventError("failed parsing pull request url from event message")
+	}
+
+	c.User, ok = user["login"].(string)
+	if !ok {
+		return commentEventError("failed parsing user information from event message")
+	}
+
+	// find resources based on parsed values
+	if repo := client.Repositories[repoName]; repo == nil {
+		return commentEventError(fmt.Sprintf("could not find '%s' repository", repoName))
+	}
+	c.Repo = *client.Repositories[repoName]
+
+	// retrieve pull request data for issue comment
+	prData := make(map[string]interface{})
+	prDataBytes, err := client.Api.GetURL(prURL)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(prDataBytes, &prData)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse pull request json")
+	}
+
+	head, ok := prData["head"].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("failed to find pull request head commit data")
 	}
 
 	c.CommitID, ok = head["sha"].(string)
 	if !ok {
-		return commentEventError("failed retrieving associated commit ID. Item did not exist or was wrong type")
+		return fmt.Errorf("failed to find commit sha from pull request data")
 	}
 
 	c.RefName, ok = head["ref"].(string)
 	if !ok {
-		return commentEventError("failed retrieving reference name. Reference name did not exist or was wrong type")
+		return fmt.Errorf("failed to find reference data from pull request data")
 	}
 
-	repoName, ok := head["repo"].(map[string]interface{})["name"].(string)
-	if !ok {
-		return commentEventError("failed retrieving repository name. Repository name did not exist or was wrong type")
+	if ref := client.Repositories[repoName].GetReference(c.RefName); ref == nil {
+		return fmt.Errorf("could not find '%s' reference in repository '%s'", c.RefName, repoName)
 	}
 
-	var repo *Repository
-	if repo, ok = client.Repositories[repoName]; !ok {
-		return commentEventError(fmt.Sprintf("could not find '%s' repository in client registry - it must be loaded before comment", repoName))
-	}
-	c.Repo = *repo
+	c.Ref = *client.Repositories[repoName].GetReference(c.RefName)
 
-	ref := repo.GetReference(c.RefName)
-	if ref == nil {
-		return commentEventError(fmt.Sprintf("could not find reference %s in %s repository", c.RefName, repoName))
-	}
-	c.Ref = *ref
 	return nil
 }
 
@@ -124,6 +157,7 @@ type Push struct {
 	Ref     Reference
 	RefName string
 	Repo    Repository
+	User    string
 }
 
 func (p *Push) Handle(client *Client, pushJSON []byte) error {
@@ -150,7 +184,7 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 		return pushEventError(fmt.Sprintf("failed parsing list of commits: %s", err))
 	}
 
-	// build up commit slive to create list from
+	// build up commit slice to create list from
 	var cSlice []Commit
 	if len(cSliceJSON) == 0 {
 		headCommit := eventMap["head_commit"]
@@ -178,6 +212,19 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	head := &cSlice[0]
 	cSlice = nil
 
+	// get user information
+	sender := map[string]interface{}{}
+	err = json.Unmarshal(eventMap["sender"], &sender)
+	if err != nil {
+		return pushEventError(fmt.Sprintf("failed retrieving sender information from message: %s", err))
+	}
+
+	var ok bool
+	if p.User, ok = sender["login"].(string); !ok {
+		return pushEventError("failed retrieving user credentials from push message")
+	}
+
+	// get reference and repository information
 	refName := string(eventMap["ref"])
 	if refName == "" {
 		return pushEventError("no reference found in event message")
@@ -186,7 +233,6 @@ func (p *Push) Handle(client *Client, pushJSON []byte) error {
 	client.Repositories[repo.Name].registerCommits(head, refName)
 	client.Cache.WriteCommits(head)
 
-	// p.Repo = *repo
 	p.Repo = *client.Repositories[repo.Name]
 	if p.Repo.GetReference(refName) == nil {
 		return pushEventError("failed to retrieve reference from repository")

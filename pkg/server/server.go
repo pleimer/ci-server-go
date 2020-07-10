@@ -62,7 +62,7 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 
 	jobManager := NewJobManager(config.GetNumWorkers(), log)
 	wg.Add(1)
-	go jobManager.Run(ctx, wg, jobChan)
+	go jobManager.Run(ctx, wg, jobChan, config.GetAuthorizedUsers())
 
 	for {
 		select {
