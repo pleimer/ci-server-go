@@ -253,5 +253,5 @@ func genTestEnvironment(script, afterScript []string) (*parser.Spec, *ghclient.C
 		}, nil
 	}
 
-	return spec, &gh, repo, &ref, commit, log, t0
+	return spec, gh, repo, &ref, commit, log, t0
 }

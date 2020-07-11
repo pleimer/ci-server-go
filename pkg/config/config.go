@@ -43,6 +43,14 @@ func (c *Config) GetAuthorizedUsers() []string {
 	return users
 }
 
+func (c *Config) GetLogLevel() string {
+	return c.sections["logger"].Options["level"].(string)
+}
+
+func (c *Config) GetLogTarget() string {
+	return c.sections["logger"].Options["target"].(string)
+}
+
 /*******************************************************************/
 type validator func(interface{}) error
 
@@ -113,6 +121,10 @@ func getConfigMetadata() map[string][]Parameter {
 		},
 		"listener": {
 			{"address", ":3000", false, []validator{stringValidatorFactory()}},
+		},
+		"logger": {
+			{"level", "INFO", false, []validator{stringValidatorFactory()}},
+			{"target", "console", false, []validator{stringValidatorFactory()}},
 		},
 		"runner": {
 			{"numWorkers", 4, false, []validator{intValidatorFactory()}},

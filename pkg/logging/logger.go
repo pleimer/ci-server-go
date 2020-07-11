@@ -20,6 +20,17 @@ const (
 	NONE
 )
 
+// FromString get log level for string
+func FromString(s string) LogLevel {
+	return map[string]LogLevel{
+		"DEBUG": DEBUG,
+		"INGO":  INFO,
+		"WARN":  WARN,
+		"ERROR": ERROR,
+		"NONE":  NONE,
+	}[s]
+}
+
 func (l LogLevel) String() string {
 	return [...]string{"DEBUG", "INFO", "WARN", "\033[0;31mERROR\033[0m"}[l]
 }
