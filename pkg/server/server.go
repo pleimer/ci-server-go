@@ -4,82 +4,122 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/pleimer/ci-server-go/pkg/config"
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
 	"github.com/pleimer/ci-server-go/pkg/job"
 	"github.com/pleimer/ci-server-go/pkg/logging"
 )
 
+var (
+	serverConfig *config.Config
+	logger       *logging.Logger
+	github       *ghclient.Client
+	jobManager   *JobManager
+	eventChan    chan ghclient.Event
+	jobChan      chan job.Job
+)
+
+// Init initialize server resources
+func Init(configPath string) error {
+	serverConfig = config.NewConfig()
+
+	file, err := os.Open(configPath)
+	if err != nil {
+		return errors.Wrap(err, "failed opening configuration file")
+	}
+	defer file.Close()
+
+	err = serverConfig.Parse(file)
+	if err != nil {
+		return errors.Wrap(err, "failed parsing configuration file")
+	}
+
+	logger, err = logging.NewLogger(logging.FromString(serverConfig.GetLogLevel()), serverConfig.GetLogTarget())
+	if err != nil {
+		fmt.Printf("error creating logger: %s\n", err)
+	}
+	logger.Timestamp = true
+	logger.Info(fmt.Sprintf("initialized logger to level %s", serverConfig.GetLogLevel()))
+
+	eventChan = make(chan ghclient.Event)
+	github = ghclient.NewClient(eventChan, serverConfig.GetUser())
+
+	jobChan = make(chan job.Job)
+	jobManager = NewJobManager(serverConfig.GetNumWorkers(), logger)
+
+	return nil
+}
+
 // Run server main function
 func Run(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	log, err := logging.NewLogger(logging.DEBUG, "ci-server-go.log")
-	if err != nil {
-		fmt.Printf("error creating logger: %s\n", err)
+	if err := checkResources(); err != nil {
+		fmt.Println(err)
 		return
 	}
-	log.Timestamp = true
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	defer log.Destroy()
-
-	config := config.NewConfig()
-	file, err := os.Open("ci-server-config.yaml")
-	if err != nil {
-		log.Metadata(map[string]interface{}{"process": "server", "error": err})
-		log.Error("failed reading config file")
-		return
-	}
-	defer file.Close()
-
-	err = config.Parse(file)
-	if err != nil {
-		log.Metadata(map[string]interface{}{"process": "server", "error": err})
-		log.Error("failed parsing config")
-		return
-	}
-
-	evChan := make(chan ghclient.Event)
-
-	gh := ghclient.NewClient(evChan, config.GetUser())
-	err = gh.Api.Authenticate(strings.NewReader(config.GetOauth()))
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	log.Info("successfully authenticated with oauth token")
 
 	wg.Add(1)
-	server := gh.Listen(wg, config.GetAddress(), log)
-	log.Info(fmt.Sprintf("listening on %s for webhooks", config.GetAddress()))
+	server := github.Listen(wg, serverConfig.GetAddress(), logger)
+	logger.Info(fmt.Sprintf("listening on %s for webhooks", serverConfig.GetAddress()))
 
-	jobChan := make(chan job.Job)
-
-	jobManager := NewJobManager(config.GetNumWorkers(), log)
 	wg.Add(1)
-	go jobManager.Run(ctx, wg, jobChan, config.GetAuthorizedUsers())
+	go jobManager.Run(ctx, wg, jobChan, serverConfig.GetAuthorizedUsers())
 
 	for {
 		select {
-		case ev := <-evChan:
-			j, err := job.Factory(ev, &gh, log)
+		case ev := <-eventChan:
+			j, err := job.Factory(ev, github, logger)
 			if err != nil {
-				log.Metadata(map[string]interface{}{"process": "server", "error": err})
-				log.Error("failed creating job from event")
+				logger.Metadata(map[string]interface{}{"process": "server", "error": err})
+				logger.Error("failed creating job from event")
 				break
 			}
 			jobChan <- j
 		case <-ctx.Done():
 			if err := server.Shutdown(ctx); err != nil {
-				log.Metadata(map[string]interface{}{"process": "server", "error": err})
-				log.Error("failed shutting down server gracefully")
+				logger.Metadata(map[string]interface{}{"process": "server", "error": err})
+				logger.Error("failed shutting down server gracefully")
 			}
 			return
 		}
 	}
+}
+
+//Close cleanup server resources
+func Close() {
+	if err := checkResources(); err != nil {
+		return
+	}
+
+	logger.Metadata(map[string]interface{}{"process": "server"})
+	logger.Info("cleaning up server resources")
+	err := logger.Destroy()
+	close(eventChan)
+	close(jobChan)
+
+	if err != nil {
+		fmt.Printf("there was an error while closing the logger: %s", err)
+		return
+	}
+	fmt.Println("server exited cleanly")
+}
+
+func checkResources() error {
+	if serverConfig == nil ||
+		logger == nil ||
+		github == nil ||
+		jobManager == nil ||
+		eventChan == nil ||
+		jobChan == nil {
+
+		return fmt.Errorf("error: not all resources were initialized - did you run server.Init()?")
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,6 +10,17 @@ import (
 
 	"github.com/pleimer/ci-server-go/pkg/server"
 )
+
+var configPath string
+
+func init() {
+	flag.Usage = func() {
+		flag.PrintDefaults()
+	}
+
+	flag.StringVar(&configPath, "config", "/etc/ci-server-go.conf.yaml", "path to config file")
+	flag.Parse()
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -30,8 +42,13 @@ func main() {
 		}
 	}()
 
+	err := server.Init(configPath)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer server.Close()
+
 	server.Run(ctx, &wg)
 	wg.Wait()
-	// Print log of successful exit right here
-	fmt.Println("server exited cleanly")
 }

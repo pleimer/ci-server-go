@@ -47,7 +47,7 @@ func TestCommentHandle(t *testing.T) {
 
 	commentEvent := &Comment{}
 
-	err = commentEvent.Handle(&gh, cData)
+	err = commentEvent.Handle(gh, cData)
 	assert.Ok(t, err)
 }
 
@@ -57,7 +57,7 @@ func TestPushHandle(t *testing.T) {
 
 		pushEvent := &Push{}
 
-		err := pushEvent.Handle(&gh, nil)
+		err := pushEvent.Handle(gh, nil)
 		assert.Assert(t, (err != nil), "should be error")
 	})
 
@@ -70,7 +70,7 @@ func TestPushHandle(t *testing.T) {
 
 		pushEvent := &Push{}
 
-		err = pushEvent.Handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(gh, testRepoJSON)
 		assert.Ok(t, err)
 
 		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
@@ -81,7 +81,7 @@ func TestPushHandle(t *testing.T) {
 		assert.Assert(t, (ref != nil), "failed to create reference")
 		assert.Assert(t, (ref.head != nil), "failed to create commit")
 
-		err = pushEvent.Handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(gh, testRepoJSON)
 		if err != nil {
 			assert.Ok(t, err)
 		}
@@ -100,7 +100,7 @@ func TestPushHandle(t *testing.T) {
 
 		pushEvent := &Push{}
 
-		err = pushEvent.Handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(gh, testRepoJSON)
 		assert.Ok(t, err)
 
 		repoName := webhook["repository"].(map[string]interface{})["name"].(string)
@@ -114,7 +114,7 @@ func TestPushHandle(t *testing.T) {
 		webhook["ref"] = "refs/head/branch2"
 		testRepoJSON, err = json.Marshal(webhook)
 
-		err = pushEvent.Handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(gh, testRepoJSON)
 		if err != nil {
 			assert.Ok(t, err)
 		}
@@ -143,7 +143,7 @@ func TestPushHandle(t *testing.T) {
 
 		pushEvent := &Push{}
 
-		err = pushEvent.Handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(gh, testRepoJSON)
 		if err != nil {
 			assert.Ok(t, err)
 		}
@@ -169,7 +169,7 @@ func TestPushHandle(t *testing.T) {
 
 		pushEvent := &Push{}
 
-		err = pushEvent.Handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(gh, testRepoJSON)
 		if err != nil {
 			assert.Assert(t, (err != nil), "should have been an error")
 		}
@@ -184,7 +184,7 @@ func TestPushHandle(t *testing.T) {
 
 		pushEvent := &Push{}
 
-		err = pushEvent.Handle(&gh, testRepoJSON)
+		err = pushEvent.Handle(gh, testRepoJSON)
 		if err != nil {
 			assert.Ok(t, err)
 		}

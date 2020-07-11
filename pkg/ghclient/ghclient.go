@@ -23,8 +23,8 @@ type Client struct {
 }
 
 // NewClient create a new github Client
-func NewClient(eventChan chan Event, user string) Client {
-	return Client{
+func NewClient(eventChan chan Event, user string) *Client {
+	return &Client{
 		Api:          NewAPI(),
 		User:         user,
 		Repositories: make(map[string]*Repository),
