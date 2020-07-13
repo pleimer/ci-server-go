@@ -28,7 +28,9 @@ func (tj *TestJob) GetRepoName() string {
 	return tj.Repo
 }
 
-func (tj *TestJob) Run(ctx context.Context, authUsers []string) {
+func (tj *TestJob) Setup(ctx context.Context, authUsers []string) {}
+
+func (tj *TestJob) Run(ctx context.Context) {
 	tj.Status = job.RUNNING
 	<-ctx.Done()
 	if ctx.Err() == context.Canceled {

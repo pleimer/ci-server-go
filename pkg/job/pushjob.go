@@ -41,8 +41,13 @@ func (p *PushJob) Compare(other queue.Item) int {
 	return 0
 }
 
+//Setup ..
+func (p *PushJob) Setup(ctx context.Context, authUsers []string) {
+
+}
+
 // Run ...
-func (p *PushJob) Run(ctx context.Context, authUsers []string) {
+func (p *PushJob) Run(ctx context.Context) {
 	commit := p.event.Ref.GetHead()
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info(fmt.Sprintf("running push job for %s", commit.Sha))

@@ -27,7 +27,7 @@ func TestPushJob(t *testing.T) {
 			Log:      log,
 		}
 
-		pj.Run(context.Background(), nil)
+		pj.Run(context.Background())
 		// expGistStr := formatGistOutput(repo.Name, commit.Sha, "t0", "Done")
 		// assert.Equals(t, expGistStr, gistString)
 	})
