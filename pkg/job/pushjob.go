@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/pleimer/ci-server-go/pkg/ghclient"
@@ -15,6 +16,7 @@ type PushJob struct {
 	client            *ghclient.Client
 	scriptOutput      []byte
 	afterScriptOutput []byte
+	execute           bool
 
 	BasePath string
 	Log      *logging.Logger
@@ -43,11 +45,43 @@ func (p *PushJob) Compare(other queue.Item) int {
 
 //Setup ..
 func (p *PushJob) Setup(ctx context.Context, authUsers []string) {
+	commit := p.event.Ref.GetHead()
+	commit.SetContext("ci-server-go")
 
+	//parse message body
+
+	p.Log.Metadata(map[string]interface{}{"process": "CommentJob", "stage": "setup"})
+	p.Log.Info("initializing push job sequence")
+	refName := strings.Trim(p.event.RefName, "\"")
+	if strings.Compare(refName, "refs/heads/master") == 0 {
+		if sliceContainsString(authUsers, p.event.User) {
+			p.Log.Metadata(map[string]interface{}{"process": "CommentJob", "stage": "setup"})
+			p.Log.Info(fmt.Sprintf("authorized user '%s' requested job for '%s' in '%s' master branch - proceeding",
+				p.event.User, commit.Sha, p.event.Repo.Name))
+
+			commit.SetStatus(ghclient.PENDING, "queued", "")
+			err := p.client.UpdateCommitStatus(p.event.Repo, *commit)
+			if err != nil {
+				p.Log.Metadata(map[string]interface{}{"process": "CommentJob", "stage": "setup", "error": err.Error()})
+				p.Log.Error("failed to update commit status to 'queued'")
+			}
+			p.execute = true
+			return
+		}
+
+		p.Log.Metadata(map[string]interface{}{"process": "CommentJob", "stage": "setup"})
+		p.Log.Info(fmt.Sprintf("user '%s' not authorized to run jobs, ignoring", p.event.User))
+	}
+	p.Log.Metadata(map[string]interface{}{"process": "CommentJob", "stage": "setup"})
+	p.Log.Info(fmt.Sprintf("push job received for ref '%s', not 'refs/heads/master' - skipping", refName))
 }
 
 // Run ...
 func (p *PushJob) Run(ctx context.Context) {
+	if !p.execute {
+		return
+	}
+
 	commit := p.event.Ref.GetHead()
 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
 	p.Log.Info(fmt.Sprintf("running push job for %s", commit.Sha))
@@ -58,14 +92,7 @@ func (p *PushJob) Run(ctx context.Context) {
 		return
 	}
 
-	//TODO - make automatic running of job configureable
-	// if sliceContainsString(authUsers, p.event.User) {
-	// 	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
-	// 	p.Log.Info(fmt.Sprintf("authorized user '%s' received - proceeding with core job", p.event.User))
-	// 	RunCoreJob(ctx, p.client, p.event.Repo, p.GetRefName(), *commit, p.Log)
-	// 	return
-	// }
-
-	// p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
-	// p.Log.Info(fmt.Sprintf("user '%s' not authorized to run jobs - ignoring", p.event.User))
+	p.Log.Metadata(map[string]interface{}{"process": "PushJob"})
+	p.Log.Info(fmt.Sprintf("proceeding with job sequence on master branch for commit %s", commit.Sha))
+	RunCoreJob(ctx, p.client, p.event.Repo, p.GetRefName(), *commit, p.Log)
 }

@@ -55,6 +55,7 @@ func (cj *CommentJob) Setup(ctx context.Context, authUsers []string) {
 				cj.Log.Metadata(map[string]interface{}{"process": "CommentJob", "stage": "setup", "error": err.Error()})
 				cj.Log.Error("failed to update commit status to 'queued'")
 			}
+			cj.execute = true
 			return
 		}
 		cj.Log.Metadata(map[string]interface{}{"process": "CommentJob", "stage": "setup"})
