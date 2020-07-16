@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -46,6 +47,14 @@ func Init(configPath string) error {
 
 	eventChan = make(chan ghclient.Event)
 	github = ghclient.NewClient(eventChan, serverConfig.GetUser())
+	err = github.Api.Authenticate(strings.NewReader(serverConfig.GetOauth()))
+	if err != nil {
+		logger.Metadata(map[string]interface{}{"module": "server", "error": err})
+		logger.Error("failed to authenticate github with oauth")
+		return err
+	}
+	logger.Metadata(map[string]interface{}{"module": "server"})
+	logger.Info("successfully authenticated github with oauth token")
 
 	jobChan = make(chan job.Job)
 	jobManager = NewJobManager(serverConfig.GetNumWorkers(), logger)

@@ -91,8 +91,9 @@ func (jb *JobManager) Run(ctx context.Context, wg *sync.WaitGroup, jobChan <-cha
 					job:    j,
 					cancel: jCancel,
 				})
+				j.Setup(jCtx, authUsers)
 				workChan <- func() {
-					j.Run(jCtx, authUsers)
+					j.Run(jCtx)
 					jb.runningJobs.Remove(j.GetRepoName(), j.GetRefName())
 				}
 			}

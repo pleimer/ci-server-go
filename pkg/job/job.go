@@ -26,11 +26,11 @@ func (js Status) String() string {
 
 // Job type contains sequence of actions for different scenarios
 type Job interface {
-	SetLogger(*logging.Logger)
-
-	Run(context.Context, []string)
+	Setup(context.Context, []string)
+	Run(context.Context)
 	Compare(queue.Item) int
 
+	SetLogger(*logging.Logger)
 	GetRefName() string
 	GetRepoName() string
 }

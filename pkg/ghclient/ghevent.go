@@ -33,11 +33,11 @@ type Comment struct {
 	Ref  Reference
 	Repo Repository
 
-	Action   string
-	RefName  string
-	Body     string
-	CommitID string
-	User     string
+	Action    string
+	RefName   string
+	Body      string
+	CommitSHA string
+	User      string
 }
 
 // Handle parses the contents of a github comment
@@ -134,7 +134,7 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 		return fmt.Errorf("failed to find pull request head commit data")
 	}
 
-	c.CommitID, ok = head["sha"].(string)
+	c.CommitSHA, ok = head["sha"].(string)
 	if !ok {
 		return fmt.Errorf("failed to find commit sha from pull request data")
 	}
