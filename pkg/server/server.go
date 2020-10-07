@@ -25,7 +25,7 @@ var (
 
 // Init initialize server resources
 func Init(configPath string) error {
-	serverConfig = config.NewConfig()
+	serverConfig = config.New()
 
 	file, err := os.Open(configPath)
 	if err != nil {
@@ -38,16 +38,16 @@ func Init(configPath string) error {
 		return errors.Wrap(err, "failed parsing configuration file")
 	}
 
-	logger, err = logging.NewLogger(logging.FromString(serverConfig.GetLogLevel()), serverConfig.GetLogTarget())
+	logger, err = logging.NewLogger(logging.FromString(serverConfig.Logger.Level), serverConfig.Logger.Target)
 	if err != nil {
 		fmt.Printf("error creating logger: %s\n", err)
 	}
 	logger.Timestamp = true
-	logger.Info(fmt.Sprintf("initialized logger to level %s", serverConfig.GetLogLevel()))
+	logger.Info(fmt.Sprintf("initialized logger to level %s", serverConfig.Logger.Level))
 
 	eventChan = make(chan ghclient.Event)
-	github = ghclient.NewClient(eventChan, serverConfig.GetUser())
-	err = github.Api.Authenticate(strings.NewReader(serverConfig.GetOauth()))
+	github = ghclient.NewClient(eventChan, serverConfig.Github.User)
+	err = github.Api.Authenticate(strings.NewReader(serverConfig.Github.Oauth))
 	if err != nil {
 		logger.Metadata(map[string]interface{}{"module": "server", "error": err})
 		logger.Error("failed to authenticate github with oauth")
@@ -57,7 +57,7 @@ func Init(configPath string) error {
 	logger.Info("successfully authenticated github with oauth token")
 
 	jobChan = make(chan job.Job)
-	jobManager = NewJobManager(serverConfig.GetNumWorkers(), logger)
+	jobManager = NewJobManager(serverConfig.Runner.NumWorkers, logger)
 
 	return nil
 }
@@ -75,11 +75,11 @@ func Run(ctx context.Context, wg *sync.WaitGroup) {
 	defer cancel()
 
 	wg.Add(1)
-	server := github.Listen(wg, serverConfig.GetAddress(), logger)
-	logger.Info(fmt.Sprintf("listening on %s for webhooks", serverConfig.GetAddress()))
+	server := github.Listen(wg, serverConfig.Listener.Address, logger)
+	logger.Info(fmt.Sprintf("listening on %s for webhooks", serverConfig.Listener.Address))
 
 	wg.Add(1)
-	go jobManager.Run(ctx, wg, jobChan, serverConfig.GetAuthorizedUsers())
+	go jobManager.Run(ctx, wg, jobChan, serverConfig.Runner.AuthorizedUsers)
 
 	for {
 		select {
