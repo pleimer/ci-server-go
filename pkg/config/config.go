@@ -1,175 +1,100 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 
 	"github.com/pkg/errors"
+	"gopkg.in/go-playground/validator.v9"
 	"gopkg.in/yaml.v2"
 )
 
-type Section struct {
-	Options map[string]interface{}
-}
-
-//Config ..
+//Config holds foundational configurations for the ci engine.
 type Config struct {
-	sections map[string]*Section
-	metadata map[string][]Parameter
+	Github struct {
+		User  string `yaml:"user" validate:"required"`
+		Oauth string `yaml:"oauth" validate:"required"`
+	} `yaml:"github" validate:"required"`
+
+	Listener struct {
+		Address string `yaml:"address" validate:"required"`
+	} `yaml:"listener" validate:"required"`
+
+	Logger struct {
+		Level  string `yaml:"level" validate:"required"`
+		Target string `yaml:"target" validate:"required"`
+	} `yaml:"logger" validate:"required"`
+
+	Runner struct {
+		NumWorkers      int      `yaml:"numWorkers" validate:"required"`
+		AuthorizedUsers []string `yaml:"authorizedUsers" validate:"required"`
+	} `yaml:"runner" validate:"required"`
 }
 
-func (c *Config) GetUser() string {
-	return c.sections["github"].Options["user"].(string)
-}
-
-func (c *Config) GetOauth() string {
-	return c.sections["github"].Options["oauth"].(string)
-}
-
-func (c *Config) GetAddress() string {
-	return c.sections["listener"].Options["address"].(string)
-}
-
-func (c *Config) GetNumWorkers() int {
-	return c.sections["runner"].Options["numWorkers"].(int)
-}
-
-func (c *Config) GetAuthorizedUsers() []string {
-	users := []string{}
-	for _, user := range c.sections["runner"].Options["authorizedUsers"].([]interface{}) {
-		users = append(users, user.(string))
-	}
-	return users
-}
-
-func (c *Config) GetLogLevel() string {
-	return c.sections["logger"].Options["level"].(string)
-}
-
-func (c *Config) GetLogTarget() string {
-	return c.sections["logger"].Options["target"].(string)
-}
-
-/*******************************************************************/
-type validator func(interface{}) error
-
-func intValidatorFactory() validator {
-	return func(input interface{}) error {
-		if _, ok := input.(int); !ok {
-			return fmt.Errorf("expected type 'int', got '%T'", input)
-		}
-		return nil
-	}
-}
-
-func stringValidatorFactory() validator {
-	return func(input interface{}) error {
-		if _, ok := input.(string); !ok {
-			return fmt.Errorf("expected type 'string', got '%T'", input)
-		}
-		return nil
-	}
-}
-
-func stringSliceValidatorFactory() validator {
-	return func(input interface{}) error {
-		if _, ok := input.([]interface{}); !ok {
-			return fmt.Errorf("expected '[]string', got '%T'", input)
-		}
-		for _, item := range input.([]interface{}) {
-			if _, ok := item.(string); !ok {
-				return fmt.Errorf("expected entry should be of type 'string', got '%T'", item)
-			}
-		}
-		return nil
-	}
-}
-
-/*******************************************************************/
-
-// Parameter ..
-type Parameter struct {
-	Name       string
-	Default    interface{}
-	Required   bool
-	Validators []validator
-}
-
-func (p *Parameter) validate(value interface{}, sectionName string) error {
-	if value == nil && p.Required {
-		return fmt.Errorf("'%s.%s' parameter required but not specified", sectionName, p.Name)
-	}
-	if value == nil && !p.Required {
-		return nil
-	}
-
-	for _, validator := range p.Validators {
-		err := validator(value)
-		if err != nil {
-			return errors.Wrapf(err, "invalid value '%v'", value)
-		}
-	}
-	return nil
-}
-
-func getConfigMetadata() map[string][]Parameter {
-	return map[string][]Parameter{
-		"github": {
-			{"user", "", true, []validator{stringValidatorFactory()}},
-			{"oauth", "", true, []validator{stringValidatorFactory()}},
+// New generate config object with defaults
+func New() *Config {
+	return &Config{
+		Listener: struct {
+			Address string `yaml:"address" validate:"required"`
+		}{
+			Address: ":3000",
 		},
-		"listener": {
-			{"address", ":3000", false, []validator{stringValidatorFactory()}},
+		Logger: struct {
+			Level  string `yaml:"level" validate:"required"`
+			Target string `yaml:"target" validate:"required"`
+		}{
+			Level:  "INFO",
+			Target: "console",
 		},
-		"logger": {
-			{"level", "INFO", false, []validator{stringValidatorFactory()}},
-			{"target", "console", false, []validator{stringValidatorFactory()}},
-		},
-		"runner": {
-			{"numWorkers", 4, false, []validator{intValidatorFactory()}},
-			{"authorizedUsers", nil, true, []validator{stringSliceValidatorFactory()}},
+		Runner: struct {
+			NumWorkers      int      `yaml:"numWorkers" validate:"required"`
+			AuthorizedUsers []string `yaml:"authorizedUsers" validate:"required"`
+		}{
+			NumWorkers: 4,
 		},
 	}
 }
 
-func NewConfig() *Config {
-	config := &Config{
-		metadata: getConfigMetadata(),
-		sections: map[string]*Section{},
-	}
-	return config
-}
-
+//Parse parse yaml from reader
 func (c *Config) Parse(r io.Reader) error {
-	c.sections = map[string]*Section{}
+	validate := validator.New()
 
-	configMap := make(map[string]map[string]interface{})
 	configBytes, err := ioutil.ReadAll(r)
 	if err != nil {
 		return errors.Wrap(err, "while reading config file")
 	}
-	err = yaml.Unmarshal(configBytes, configMap)
+
+	err = yaml.Unmarshal(configBytes, c)
 	if err != nil {
 		return errors.Wrap(err, "while parsing yaml")
 	}
 
-	for sectionName, parameters := range c.metadata {
-		c.sections[sectionName] = &Section{}
-		c.sections[sectionName].Options = map[string]interface{}{}
-		for _, param := range parameters {
-			c.sections[sectionName].Options[param.Name] = param.Default
-
-			option := configMap[sectionName][param.Name]
-			err := param.validate(option, sectionName)
-			if err != nil {
-				return errors.Wrapf(err, "failed to validate parameter '%s'", param.Name)
+	err = validate.Struct(c)
+	if err != nil {
+		if e, ok := err.(validator.ValidationErrors); ok {
+			missingFields := []string{}
+			for _, fe := range e {
+				missingFields = append(missingFields, setCamelCase(fe.Namespace()))
 			}
-			if option != nil {
-				c.sections[sectionName].Options[param.Name] = option
-			}
+			return fmt.Errorf("missing fields in config: (%s)", strings.Join(missingFields, " , "))
 		}
+		return errors.Wrap(err, "error while validating configuration")
 	}
 
 	return nil
+}
+
+func setCamelCase(field string) string {
+	items := strings.Split(field, ".")
+	ret := []string{}
+	for _, item := range items {
+		camel := []byte(item)
+		l := bytes.ToLower([]byte{camel[0]})
+		camel[0] = l[0]
+		ret = append(ret, string(camel))
+	}
+	return strings.Join(ret, ".")
 }

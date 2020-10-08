@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"gopkg.in/go-playground/validator.v9"
 )
 
 // add pull request and comment
@@ -28,6 +29,24 @@ func EventFactory(incoming string) (Event, error) {
 	return nil, fmt.Errorf("unknown event type '%s'", incoming)
 }
 
+type commentWebHook struct {
+	Action string `json:"action" validate:"required"`
+	Issue  struct {
+		PullRequest struct {
+			URL string `json:"url" validate:"required"`
+		} `json:"pull_request" validate:"required"`
+	} `json:"issue" validate:"required"`
+	Comment struct {
+		User struct {
+			Login string `json:"login" validate:"required"`
+		} `json:"user" validate:"required"`
+		Body string `json:"body" validate:"required"`
+	} `json:"comment" validate:"required"`
+	Repository struct {
+		Name string `json:"name" validate:"required"`
+	} `json:"repository" validate:"required"`
+}
+
 // Comment implements Event interface. Represents a github comment webhook
 type Comment struct {
 	Ref  Reference
@@ -40,7 +59,7 @@ type Comment struct {
 	User      string
 }
 
-// Handle parses the contents of a github comment
+// Handle parses the contents of a github issue comment
 func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	// There are four types of comment webhooks:
 	// 1. commit_comment
@@ -49,81 +68,35 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	// 4. issue_comment
 
 	// This event handles only #4
+	validator := validator.New()
 
-	var ok bool
-
-	eventMap := make(map[string]interface{})
-	err := json.Unmarshal(commentJSON, &eventMap)
+	comment := commentWebHook{}
+	err := json.Unmarshal(commentJSON, &comment)
 	if err != nil {
 		return commentEventError(fmt.Sprintf("failed parsing comment event json: %s", err))
 	}
 
-	// first level attributes
-	c.Action, ok = eventMap["action"].(string)
-	if !ok {
-		return commentEventError("failed parsing comment event json: event data did not contain 'action' attribute")
+	err = validator.Struct(comment)
+	if err != nil {
+		return commentEventError(fmt.Sprintf("json validation failed: %s", err))
 	}
 
-	issue, ok := eventMap["issue"].(map[string]interface{})
-	if !ok {
-		return commentEventError("failed parsing comment event json: event data did not contain 'issue' attribute")
-	}
-
-	comment, ok := eventMap["comment"].(map[string]interface{})
-	if !ok {
-		return commentEventError("failed parsing comment event json: event data did not contain 'comment' attribute")
-	}
-
-	repository, ok := eventMap["repository"].(map[string]interface{})
-	if !ok {
-		return commentEventError("failed parsing comment event json: event data did not contain 'repository' attribute")
-	}
-
-	// second level attributes
-	pullRequest, ok := issue["pull_request"].(map[string]interface{})
-	if !ok {
-		return commentEventError("failed parsing pull request data from event message")
-	}
-
-	user, ok := comment["user"].(map[string]interface{})
-	if !ok {
-		return commentEventError("failed parsing user data from event message")
-	}
-
-	c.Body, ok = comment["body"].(string)
-	if !ok {
-		return commentEventError("failed parsing comment body from event message")
-	}
-
-	repoName, ok := repository["name"].(string)
-	if !ok {
-		return commentEventError("failed parsing repository name from event message")
-	}
-
-	// third level attributes
-	prURL, ok := pullRequest["url"].(string)
-	if !ok {
-		return commentEventError("failed parsing pull request url from event message")
-	}
-
-	c.User, ok = user["login"].(string)
-	if !ok {
-		return commentEventError("failed parsing user information from event message")
-	}
+	c.Action = comment.Action
+	c.Body = comment.Comment.Body
+	c.User = comment.Comment.User.Login
 
 	// find resources based on parsed values
-	if repo := client.Repositories[repoName]; repo == nil {
-		return commentEventError(fmt.Sprintf("could not find '%s' repository", repoName))
+	if repo := client.Repositories[comment.Repository.Name]; repo == nil {
+		return commentEventError(fmt.Sprintf("could not find '%s' repository", comment.Repository.Name))
 	}
-	c.Repo = *client.Repositories[repoName]
+	c.Repo = *client.Repositories[comment.Repository.Name]
 
 	// retrieve pull request data for issue comment
 	prData := make(map[string]interface{})
-	prDataBytes, err := client.Api.GetURL(prURL)
+	prDataBytes, err := client.Api.GetURL(comment.Issue.PullRequest.URL)
 	if err != nil {
 		return err
 	}
-
 	err = json.Unmarshal(prDataBytes, &prData)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse pull request json")
@@ -148,11 +121,11 @@ func (c *Comment) Handle(client *Client, commentJSON []byte) error {
 	c.RefName = strings.Join([]string{"refs", "heads", c.RefName}, "/")
 	c.RefName = "\"" + c.RefName + "\""
 
-	if ref := client.Repositories[repoName].GetReference(c.RefName); ref == nil {
-		return fmt.Errorf("could not find '%s' reference in repository '%s'", c.RefName, repoName)
+	if ref := client.Repositories[comment.Repository.Name].GetReference(c.RefName); ref == nil {
+		return fmt.Errorf("could not find '%s' reference in repository '%s'", c.RefName, comment.Repository.Name)
 	}
 
-	c.Ref = *client.Repositories[repoName].GetReference(c.RefName)
+	c.Ref = *client.Repositories[comment.Repository.Name].GetReference(c.RefName)
 
 	return nil
 }

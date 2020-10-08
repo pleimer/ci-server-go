@@ -35,6 +35,11 @@ func getWebhook() map[string]interface{} {
 }
 
 func TestCommentHandle(t *testing.T) {
+	standard := Comment{
+		Action: "created",
+		Body:   "/runtest\n",
+		User:   "testuser",
+	}
 	cData, err := ioutil.ReadFile("payloads/comment.json")
 	assert.Ok(t, err)
 
@@ -45,10 +50,12 @@ func TestCommentHandle(t *testing.T) {
 	repo.refs = make(map[string]*Reference)
 	repo.refs["changes"] = &Reference{}
 
+	standard.Repo = *repo
+
 	commentEvent := &Comment{}
 
 	err = commentEvent.Handle(gh, cData)
-	assert.Ok(t, err)
+	assert.Equals(t, standard, *commentEvent)
 }
 
 func TestPushHandle(t *testing.T) {

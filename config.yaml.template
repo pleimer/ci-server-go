@@ -5,6 +5,10 @@ github:
 listener: 
     address: # listen for webhooks here
 
+logger:
+    level: # DEBUG,INFO,WARN,ERROR,NONE
+    target: # 'console' or filepath
+
 runner:
     numWorkers: # number of jobs that can run in parallel
     authorizedUsers: # users athorized to run CI jobs
