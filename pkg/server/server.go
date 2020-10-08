@@ -40,7 +40,7 @@ func Init(configPath string) error {
 
 	logger, err = logging.NewLogger(logging.FromString(serverConfig.Logger.Level), serverConfig.Logger.Target)
 	if err != nil {
-		fmt.Printf("error creating logger: %s\n", err)
+		return fmt.Errorf("error creating logger: %s", err)
 	}
 	logger.Timestamp = true
 	logger.Info(fmt.Sprintf("initialized logger to level %s", serverConfig.Logger.Level))
