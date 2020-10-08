@@ -14,21 +14,39 @@ go build cmd/server.go
 ```
 
 # Configuration
-Configurations are passed in with environmental variables
+Configurations are loaded by default from `/etc/ci-server-go.conf.yaml`. Custom locations can be specified with the `-config` option.
 
-*var* | *default* | *description*
----------- |---------- | ----------
-GITHUB_USER | - | name of github user that server should run as
-OAUTH | - | oauth token for the above mentioned user
-ADDRESS | localhost:3000 | address on which to listen for webhooks
-NUM_WORKERS | 4 | max number of jobs that can execute in parallel
+A user with admin access to the repositories intended to use this CI must be configured. The server runs under this user.
 
-For results to be posted to github, the configured user must have access to repositories the server is intended to run on.
+```yaml
+github:
+    user:   # username with admin privledges to monitored repositories
+    oauth:  # oauth token for above user
+
+listener: 
+    address: # [Optional] listen for webhooks here. Default: localhost:3000
+
+logger:
+    level:  # [Optional] DEBUG,INFO,WARN,ERROR,NONE. Default: INFO
+    target: # [Optional] 'console' or filepath. Default: 'console'
+
+runner:
+    numWorkers: # [Optional] number of jobs that can run in parallel. Default: 4
+    authorizedUsers: # users athorized to run CI jobs
+        - user1
+        - user2
+```
 
 # Run
 ```bash
 ./server
 ```
+
+## Options
+Option | Description
+-|-
+-help | show help menu
+-config | specify config file location
 
 # ci.yml
 
